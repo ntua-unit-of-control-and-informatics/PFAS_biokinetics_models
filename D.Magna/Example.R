@@ -107,6 +107,7 @@ ode_func <- function(time, inits, params){
     # ke: 1/h
     
     # For 1 hour uptake experiment
+    #This is Eleni
     if (time<1){
         dA_daphnia <- ku - ke*A_daphnia  
     }else{
