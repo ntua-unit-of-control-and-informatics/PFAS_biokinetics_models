@@ -106,12 +106,9 @@ ode_func <- function(time, inits, params){
     # ku: intensity/h
     # ke: 1/h
     
+    # For 1 hour uptake experiment
     if (time<1){
-      if(time<lag){
-        dA_daphnia <- ku 
-      }else{
         dA_daphnia <- ku - ke*A_daphnia  
-      }
     }else{
       dA_daphnia <- -ke*A_daphnia  
     }
