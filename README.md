@@ -1,2 +1,2 @@
 # PFAS_biokinetics_models
-This repository contains code for developing biokinetics model for PFAS under the SCENARIOS H2020 project
+This repository contains R code for developing biokinetics models for describing PFAS biodistribution in several environmental species and deploying as web services on Jaqpot (https://www.jaqpot.org/). This work is part of the SCENARIOS EU H2020 project (https://scenarios-project.eu/). The list of available biokinetics models will be updated throughout the lifespan of the project.
