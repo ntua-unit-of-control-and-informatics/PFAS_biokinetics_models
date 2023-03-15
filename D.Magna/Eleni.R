@@ -1,6 +1,7 @@
 # Working directory
-setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
 
+#setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
+setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
 
 # Function for estimating length of D. magna based on age (from Betini et al. (2019))
 # Input: age [days], temperature [oC], food["low"/"high"]/ Output: length [mm]
@@ -203,19 +204,17 @@ ode_func <- function(time, inits, params){
 
 
 
-obj_func <- function(x, list_of_experiments, metric){
-  score_per_experiment <- c()
-  lag <- x[1]
-  for (k in 0:(length(list_of_experiments)-1)) { # loop over the experiments from different papers
-    params_to_fit <- x[(k*4+2):(k*4+5)]
-    exp_data <- list_of_experiments[[k+1]]
-    exp_time <- exp_data[,1]
+obj_func <- function(x, PFAS, Cwater, Dparams, metric){
+    params_to_fit <- x
+    exp_data <- experiment
     score_per_type <- c()
     
-    #loop over PS50 and PS500
-    for (j in 1:2){
-      ku <- params_to_fit[2*j-1];ke = params_to_fit[2*j]
-      intensity <- exp_data[,1+j]
+    Frate <- Dparams$Frate
+    weight <- Dparams$weight
+    Cw <- Cwater
+    BodyBurden <- PFAS$Concentration
+    exp_time <- PFAS$Concentration
+    
       sol_times <- seq(0,7, 0.01)
       inits <- c('A_daphnia'= intensity[1])
       params <- c("ku"=ku, "ke"=ke, "lag"= lag)
