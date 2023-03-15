@@ -48,11 +48,10 @@ Size_estimation <<- function(age, temperature = 22, food="high"){
 }
 
 
-
+# Filtering rate of Daphnia magna is calculated based on Burns et al. 1969 or Preuss.
+# Input: length [mm],Temperature [oC]/ Output: filtration rate[mL/h]
 Filtration_rate_estimation <<- function(length, temperature = 22, method = "Preuss"){
   if(method == "Burns"){
-    # Filtering rate of Daphnia magna is calculated based on Burns et al. 1969.
-    # Input: length [mm],Temperature [oC]/ Output: filtration rate[mL/h]
     F_rate_15 <- 0.153 * length^2.16
     F_rate_20 <- 0.208 * length^2.80
     F_rate_25 <- 0.202 * length^2.38
@@ -72,6 +71,16 @@ Filtration_rate_estimation <<- function(length, temperature = 22, method = "Preu
   return(F_rate)
 }
 
+
+# Dumont et al. (1975)
+# Input: length [mm]/ Output: dry weight[mg]
+dry_weight_estimation <<- function(L){
+  
+  w1 = (1.89e-06*(L*1000)^2.25)/1000 #Donka Lake
+  w2 = (4.88e-05*(L*1000)^1.80)/1000 #River Sambre
+  # Selected w1 after validation with Martin-Creuzburg et al. (2018
+  return(w1)
+}
 
 ################################################################################
 # Load the data for PFAS concentration
@@ -179,16 +188,14 @@ ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
     
     # Units explanation:
-    # A_daphnia: daphnia fluorescence intensity
-    # ku: intensity/h
+    # C_daphnia: ng PFAS/g D.magna WW
+    # ku: 
     # ke: 1/h
+    # Cw: ng/L
+    #
     
-    # For 1 hour uptake experiment
-    if (time<1){
-      dA_daphnia <- ku - ke*A_daphnia  
-    }else{
-      dA_daphnia <- -ke*A_daphnia  
-    }
+      dCw <- 0
+      dC_daphnia <- Frate*Cw/weight +  Fsorption*Cw/weight  - ke*C_daphnia  
     
     return(list(c( dA_daphnia)))
   })
