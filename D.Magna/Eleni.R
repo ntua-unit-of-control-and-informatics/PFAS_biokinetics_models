@@ -1,6 +1,78 @@
 # Working directory
 setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
 
+
+# Function for estimating length of D. magna based on age (from Betini et al. (2019))
+# Input: age [days], temperature [oC], food["low"/"high"]/ Output: length [mm]
+# Considers female D. magna
+Size_estimation <<- function(age, temperature = 22, food="high"){
+  
+  # T = 15 o C
+  a_low_15 <-0.354
+  b_low_15 <- 0.527
+  a_high_15 <- 0.105
+  b_high_15 <- 0.953
+  
+  # T = 25 o C
+  a_low_25 <- 0.811
+  b_low_25 <- 0.355
+  a_high_25 <- 0.698
+  b_high_25 <- 0.83
+  
+  if(food == "low"){
+    if(temperature <= 15){
+      a <- a_low_15
+      b <- b_low_15
+    }else if(temperature >= 25){  
+      a <- a_low_25
+      b <- b_low_25
+    }else{ 
+      a <- approx(c(15,25), c(a_low_15, a_low_25), temperature)$y
+      b <- approx(c(15,25), c(b_low_15, b_low_25), temperature)$y
+    }
+  }else if (food == "high"){
+    if(temperature <= 15){
+      a <- a_high_15
+      b <- b_high_15
+    }else if(temperature >= 25){  
+      a <- a_high_25
+      b <- b_high_25
+    }else{ 
+      a <- approx(c(15,25), c(a_high_15, a_high_25), temperature)$y
+      b <- approx(c(15,25), c(b_high_15, b_high_25), temperature)$y
+    }
+  }else{
+    stop('food must be either "low" or "high" ')
+  }
+  return(a + b * log(age))
+}
+
+
+
+Filtration_rate_estimation <<- function(length, temperature = 22, method = "Preuss"){
+  if(method == "Burns"){
+    # Filtering rate of Daphnia magna is calculated based on Burns et al. 1969.
+    # Input: length [mm],Temperature [oC]/ Output: filtration rate[mL/h]
+    F_rate_15 <- 0.153 * length^2.16
+    F_rate_20 <- 0.208 * length^2.80
+    F_rate_25 <- 0.202 * length^2.38
+    
+    if(temperature <= 15){
+      F_rate <- F_rate_15
+    }else if(temperature >= 25){  
+      F_rate <- F_rate_25
+    }else{ 
+      F_rate <- approx(c(15,20,25), c(F_rate_15, F_rate_20, F_rate_25), temperature)$y
+    }
+  }else if(method == "Preuss"){
+    F_rate <- 0.5*length^2.45
+  }else{
+    stop("Please select a valid estimation method; either 'Burns' or 'Preuss' ")
+  }
+  return(F_rate)
+}
+
+
 ################################################################################
 # Load the data for PFAS concentration
 
