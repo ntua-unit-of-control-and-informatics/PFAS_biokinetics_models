@@ -108,7 +108,7 @@ ode_func <- function(time, inits, params){
     
     # For 1 hour uptake experiment
     if (time<1){
-        dA_daphnia <- ku - ke*A_daphnia  
+      dA_daphnia <- ku - ke*A_daphnia  
     }else{
       dA_daphnia <- -ke*A_daphnia  
     }
@@ -127,7 +127,7 @@ obj_func <- function(x, list_of_experiments, metric){
     exp_data <- list_of_experiments[[k+1]]
     exp_time <- exp_data[,1]
     score_per_type <- c()
-
+    
     #loop over PS50 and PS500
     for (j in 1:2){
       ku <- params_to_fit[2*j-1];ke = params_to_fit[2*j]
@@ -136,23 +136,23 @@ obj_func <- function(x, list_of_experiments, metric){
       inits <- c('A_daphnia'= intensity[1])
       params <- c("ku"=ku, "ke"=ke, "lag"= lag)
       solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
-                                            y = inits,
-                                            parms = params,
-                                            method="lsodes",
-                                            rtol = 1e-5, atol = 1e-5))
-        
-        if(sum(solution$time %in% exp_time) == dim(exp_data)[1]){
-          results <- solution[which(solution$time %in% exp_time), 'A_daphnia']
-        } else{
-          stop(print("Length of predictions is not equal to the length of data"))
-        }
-        if(metric == "AAFE"){
-          score_per_type[j] <- AAFE(results, exp_data[,j+1]) 
-        }else if (metric =="rmse"){
-          score_per_type[j] <- rmse(exp_data[,j+1], results)
-        }else if(metric == "PBKOF")
-          score_per_type[j] <- PBKOF(list(exp_data[,j+1]), list(results))
+                                          y = inits,
+                                          parms = params,
+                                          method="lsodes",
+                                          rtol = 1e-5, atol = 1e-5))
+      
+      if(sum(solution$time %in% exp_time) == dim(exp_data)[1]){
+        results <- solution[which(solution$time %in% exp_time), 'A_daphnia']
+      } else{
+        stop(print("Length of predictions is not equal to the length of data"))
       }
+      if(metric == "AAFE"){
+        score_per_type[j] <- AAFE(results, exp_data[,j+1]) 
+      }else if (metric =="rmse"){
+        score_per_type[j] <- rmse(exp_data[,j+1], results)
+      }else if(metric == "PBKOF")
+        score_per_type[j] <- PBKOF(list(exp_data[,j+1]), list(results))
+    }
     score_per_experiment[k+1] <- mean(score_per_type)
   }
   
@@ -174,21 +174,21 @@ plot_func <- function(optimization, list_of_experiments){
     keep_predictions <- data.frame(matrix(NA, nrow = length(sol_times), ncol = 3))
     keep_predictions[,1] <- sol_times
     colnames(keep_predictions) <- c('Time', 'PS50', 'PS500')
-      #loop over PS50 and PS500
-      for (j in 1:2){
-        ku <- params_to_fit[2*j-1];ke = params_to_fit[2*j]
-        intensity <- exp_data[,1+j]
-        inits <- c('A_daphnia'= intensity[1])
-        params <- c("ku"=ku, "ke"=ke, "lag"= lag)
-        solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
-                                            y = inits,
-                                            parms = params,
-                                            method="lsodes",
-                                            rtol = 1e-5, atol = 1e-5))
-        keep_predictions[,j+1] <- solution$A_daphnia
-        
-      }
+    #loop over PS50 and PS500
+    for (j in 1:2){
+      ku <- params_to_fit[2*j-1];ke = params_to_fit[2*j]
+      intensity <- exp_data[,1+j]
+      inits <- c('A_daphnia'= intensity[1])
+      params <- c("ku"=ku, "ke"=ke, "lag"= lag)
+      solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                          y = inits,
+                                          parms = params,
+                                          method="lsodes",
+                                          rtol = 1e-5, atol = 1e-5))
+      keep_predictions[,j+1] <- solution$A_daphnia
       
+    }
+    
     
     strings <- c("PS50", "PS500")
     color_codes <- scales::hue_pal()(2) # to return 3 color codes 
@@ -197,35 +197,35 @@ plot_func <- function(optimization, list_of_experiments){
       cls[i] <- color_codes[i]
       names(cls)[i] <- strings[i]
     }
-     
-      draw_plot <- ggplot()+
-        geom_line(data = keep_predictions, aes(x=Time, y=PS50, color=strings[1]), size=1.7)+
-        geom_line(data = keep_predictions, aes(x=Time, y=PS500, color=strings[2]), size=1.7)+
-
-        geom_point(data = exp_data, aes(x=Time, y=PS50, color=strings[1]), size=5)+
-        geom_point(data = exp_data, aes(x=Time, y=PS500, color=strings[2]), size=5)+
-        #scale_y_log10()+
-        
-        
-        labs(title = paste0("Fluorescence intensity in D.magna of mode ", k+1),
-             y = "Fluorescence intensity", x = "Time (hours)")+
-        theme(plot.title = element_text(hjust = 0.5,size=30), 
-              axis.title.y =element_text(hjust = 0.5,size=25,face="bold"),
-              axis.text.y=element_text(size=22),
-              axis.title.x =element_text(hjust = 0.5,size=25,face="bold"),
-              axis.text.x=element_text(size=22),
-              legend.title=element_text(hjust = 0.5,size=25), 
-              legend.text=element_text(size=22)) + 
-        
-        scale_color_manual("PS type", values=cls)+
-        theme(legend.key.size = unit(1.5, 'cm'),  
-              legend.title = element_text(size=14),
-              legend.text = element_text(size=14),
-              axis.text = element_text(size = 14))
-      print(draw_plot)
+    
+    draw_plot <- ggplot()+
+      geom_line(data = keep_predictions, aes(x=Time, y=PS50, color=strings[1]), size=1.7)+
+      geom_line(data = keep_predictions, aes(x=Time, y=PS500, color=strings[2]), size=1.7)+
+      
+      geom_point(data = exp_data, aes(x=Time, y=PS50, color=strings[1]), size=5)+
+      geom_point(data = exp_data, aes(x=Time, y=PS500, color=strings[2]), size=5)+
+      #scale_y_log10()+
       
       
-    }
+      labs(title = paste0("Fluorescence intensity in D.magna of mode ", k+1),
+           y = "Fluorescence intensity", x = "Time (hours)")+
+      theme(plot.title = element_text(hjust = 0.5,size=30), 
+            axis.title.y =element_text(hjust = 0.5,size=25,face="bold"),
+            axis.text.y=element_text(size=22),
+            axis.title.x =element_text(hjust = 0.5,size=25,face="bold"),
+            axis.text.x=element_text(size=22),
+            legend.title=element_text(hjust = 0.5,size=25), 
+            legend.text=element_text(size=22)) + 
+      
+      scale_color_manual("PS type", values=cls)+
+      theme(legend.key.size = unit(1.5, 'cm'),  
+            legend.title = element_text(size=14),
+            legend.text = element_text(size=14),
+            axis.text = element_text(size = 14))
+    print(draw_plot)
+    
+    
+  }
   
   
   
@@ -234,7 +234,7 @@ plot_func <- function(optimization, list_of_experiments){
 
 
 list_of_experiments <- list("mode1" = mode1,"mode2" = mode2,
-                             "mode3" = mode3, "mode4" = mode4)
+                            "mode3" = mode3, "mode4" = mode4)
 
 x0 <- c(0.5, rep(c(5000,0.1), 8))
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBPLX" , #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
