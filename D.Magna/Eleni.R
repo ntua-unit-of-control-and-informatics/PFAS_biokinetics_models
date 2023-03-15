@@ -1,12 +1,17 @@
 # Working directory
-setwd('C:/Users/ptsir/Desktop/projects/NanoSolveIt/polystyrene')
+setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
 
 ################################################################################
-# Load the data for concentration = 0.1 mg/l
-mode1 <- read.csv('mode1.csv')
-mode2 <- read.csv('mode2.csv')
-mode3 <- read.csv('mode3.csv')
-mode4 <- read.csv('mode4.csv')
+# Load the data for PFAS concentration
+
+PFOA <- read.csv('PFOA.csv')
+PFOS <- read.csv('PFOS.csv')
+PFNA <- read.csv('PFNA.csv')
+PFDA <- read.csv('PFDA.csv')
+PFUnA <- read.csv('PFUnA.csv')
+PFDoA <- read.csv('PFDoA.csv')
+
+
 
 # *** metrics ***
 
