@@ -190,7 +190,7 @@ ode_func <- function(time, inits, params){
     
     # Units explanation:
     # C_daphnia: ng PFAS/g D.magna WW
-    # ku: 
+    # ku: Frate/g D.magna
     # ke: 1/h
     # Cw: ng/L
     #
