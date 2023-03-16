@@ -1,7 +1,7 @@
 # Working directory
 
-#setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
-setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
+setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
+#setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
 
 # Function for estimating length of D. magna based on age (from Betini et al. (2019))
 # Input: age [days], temperature [oC], food["low"/"high"]/ Output: length [mm]
@@ -84,7 +84,7 @@ dry_weight_estimation <<- function(L){
 }
 
 ################################################################################
-# Load the data for PFAS concentration
+# Load the data for PFAS concentration from Dai et al. (2013)
 
 PFOA <- read.csv('PFOA.csv')
 PFOS <- read.csv('PFOS.csv')
@@ -183,7 +183,7 @@ PBKOF <- function(observed, predicted, comp.names =NULL){
 # Functions used for the optimization #
 #=====================================#
 
-# ode_func(): the differential equation system that deiscribes the model
+# ode_func(): the differential equation system that describes the model
 
 ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
