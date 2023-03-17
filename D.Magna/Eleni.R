@@ -83,15 +83,33 @@ dry_weight_estimation <<- function(L){
   return(w1)
 }
 
+
 ################################################################################
 # Load the data for PFAS concentration
 
 PFOA <- read.csv('PFOA.csv')
+PFOA <- PFOA[2:dim(PFOA)[1],]
+PFOA[,1] <-  round(PFOA[,1])
+
 PFOS <- read.csv('PFOS.csv')
+PFOS <- PFOS[2:dim(PFOS)[1],]
+PFOS[,1] <-  round(PFOS[,1])
+
 PFNA <- read.csv('PFNA.csv')
+PFNA <- PFNA[2:dim(PFNA)[1],]
+PFNA[,1] <-  round(PFNA[,1])
+
 PFDA <- read.csv('PFDA.csv')
+PFDA <- PFDA[2:dim(PFDA)[1],]
+PFDA[,1] <-  round(PFDA[,1])
+
 PFUnA <- read.csv('PFUnA.csv')
+PFUnA <- PFUnA[2:dim(PFUnA)[1],]
+PFUnA[,1] <-  round(PFUnA[,1])
+
 PFDoA <- read.csv('PFDoA.csv')
+PFDoA <- PFDoA[2:dim(PFDoA)[1],]
+PFDoA[,1] <-  round(PFDoA[,1])
 
 
 
@@ -122,7 +140,6 @@ AAFE <- function(predictions, observations, times=NULL){
   aafe <- 10^(sum(log_ratio)/N) 
   return(aafe)
 }
-
 
 PBKOF <- function(observed, predicted, comp.names =NULL){
   # Check if the user provided the correct input format
@@ -183,115 +200,112 @@ PBKOF <- function(observed, predicted, comp.names =NULL){
 # Functions used for the optimization #
 #=====================================#
 
-# ode_func(): the differential equation system that deiscribes the model
+# ode_func(): the differential equation system that describes the model
 
 ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
     
     # Units explanation:
     # C_daphnia: ng PFAS/g D.magna WW
-    # ku: 
     # ke: 1/h
     # Cw: ng/L
-    #
+    # Fsorption:  L/d/g D.magna WW
     
-      dCw <- 0
-      dC_daphnia <- Frate*Cw/weight +  Fsorption*Cw/weight  - ke*C_daphnia  
+    age <- init_age + time
+    #size in mm
+    size <- Size_estimation(age, temperature = 20, food="high")
     
-    return(list(c( dA_daphnia)))
+    # Filtation rate in mL/h
+    Frate <- Filtration_rate_estimation(size, temperature = 20, method = "Preuss")
+    # Filtation rate in L/day
+    Frate <- Frate * 24/1000
+    
+    # dry weight mg
+    DW <- dry_weight_estimation(size)
+    # Convert DW to WW
+    WW <- 15 * DW  # Conversion rate 11-20 from DW to WW (Garner et al., 2018)
+    # Another post discussing DW to WW can be accessed through:
+    #https://www.madsci.org/posts/archives/2005-09/1127049424.Zo.r.html
+    
+    
+    # Water concentration in ng/L
+    dCw <- 0
+    # D.magna concentration in ng/g
+    dC_daphnia <- Frate*Cw/WW +  Fsorption*Cw/WW  - ke*C_daphnia  
+    
+    return(list(c("dCw" = dCw, "dC_daphnia" = dC_daphnia), "Frate" = Frate,
+                "WW" = WW))
   })
 }
 
 
 
-obj_func <- function(x, PFAS, Cwater, Dparams, metric){
-    params_to_fit <- x
-    exp_data <- experiment
-    score_per_type <- c()
+obj_func <- function(x, PFAS, Cwater, age, metric){
+     
+    # User defined parameters
+    init_age <- age
+    # Fitted parameters
+    Fsorption <- x[1]
+    ke <- x[2]
+    # Water concentration
+    Cw <- Cwater * 1e06 #ng/L
     
-    Frate <- Dparams$Frate
-    weight <- Dparams$weight
-    Cw <- Cwater
     BodyBurden <- PFAS$Concentration
-    exp_time <- PFAS$Concentration
-    
-      sol_times <- seq(0,7, 0.01)
-      inits <- c('A_daphnia'= intensity[1])
-      params <- c("ku"=ku, "ke"=ke, "lag"= lag)
-      solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+    exp_time <- PFAS$Time
+    sol_times <- seq(0,round(max(PFAS$Time))+1, 0.01 )
+    inits <- c('C_daphnia'= 0, "Cw" = Cw)
+    params <- c("init_age"=init_age, "Fsorption"= Fsorption, "ke"  = ke)
+    solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                           y = inits,
                                           parms = params,
                                           method="lsodes",
                                           rtol = 1e-5, atol = 1e-5))
       
-      if(sum(solution$time %in% exp_time) == dim(exp_data)[1]){
-        results <- solution[which(solution$time %in% exp_time), 'A_daphnia']
-      } else{
+      if(sum(solution$time %in% exp_time) == length(exp_time)){
+        results <- solution[which(solution$time %in% exp_time), 'C_daphnia']
+      }else{
         stop(print("Length of predictions is not equal to the length of data"))
       }
       if(metric == "AAFE"){
-        score_per_type[j] <- AAFE(results, exp_data[,j+1]) 
+        score <- AAFE(results,BodyBurden) 
       }else if (metric =="rmse"){
-        score_per_type[j] <- rmse(exp_data[,j+1], results)
-      }else if(metric == "PBKOF")
-        score_per_type[j] <- PBKOF(list(exp_data[,j+1]), list(results))
+        score <- rmse(BodyBurden, results)
+      }else if(metric == "PBKOF"){
+        score <- PBKOF(list(BodyBurden), list(results))
     }
-    score_per_experiment[k+1] <- mean(score_per_type)
-  }
-  
-  return(mean(score_per_experiment))
-  
+  return(score)
 }
 
-plot_func <- function(optimization, list_of_experiments){
+plot_func <- function(optimization, PFAS, Cwater, age){
   library(ggplot2)
   x <- optimization$solution
-  plots <- list()
-  
-  for (k in 1:length(list_of_experiments)-1) { # loop over the experiments from different papers
-    params_to_fit <- x[(k*4+2):(k*4+5)]
-    exp_data <- list_of_experiments[[k+1]]
-    exp_time <- exp_data[,1]
-    sol_times <- seq(0,7, 0.01)
+  # User defined parameters
+  init_age <- age
+  # Fitted parameters
+  Fsorption <- x[1]
+  ke <- x[2]
+  # Water concentration
+  Cw <- Cwater * 1e06 #ng/L
+  exp_time <- PFAS$Time
+  sol_times <- seq(0,round(max(PFAS$Time))+1, 0.01 )
+  inits <- c('C_daphnia'= 0, "Cw" = Cw)
+  params <- c("init_age"=init_age, "Fsorption"= Fsorption, "ke"  = ke)
+  solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                      y = inits,
+                                      parms = params,
+                                      method="lsodes",
+                                      rtol = 1e-5, atol = 1e-5))
+  keep_predictions <- data.frame(matrix(NA, nrow = length(sol_times), ncol =2))
+  keep_predictions[,1] <- sol_times
+  colnames(keep_predictions) <- c('Time', 'BodyBurden')
+  keep_predictions[,2] <- solution[,"C_daphnia"]
+
     
-    keep_predictions <- data.frame(matrix(NA, nrow = length(sol_times), ncol = 3))
-    keep_predictions[,1] <- sol_times
-    colnames(keep_predictions) <- c('Time', 'PS50', 'PS500')
-    #loop over PS50 and PS500
-    for (j in 1:2){
-      ku <- params_to_fit[2*j-1];ke = params_to_fit[2*j]
-      intensity <- exp_data[,1+j]
-      inits <- c('A_daphnia'= intensity[1])
-      params <- c("ku"=ku, "ke"=ke, "lag"= lag)
-      solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
-                                          y = inits,
-                                          parms = params,
-                                          method="lsodes",
-                                          rtol = 1e-5, atol = 1e-5))
-      keep_predictions[,j+1] <- solution$A_daphnia
-      
-    }
-    
-    
-    strings <- c("PS50", "PS500")
-    color_codes <- scales::hue_pal()(2) # to return 3 color codes 
-    cls <- c()  
-    for (i in 1:length(strings)) {
-      cls[i] <- color_codes[i]
-      names(cls)[i] <- strings[i]
-    }
-    
-    draw_plot <- ggplot()+
-      geom_line(data = keep_predictions, aes(x=Time, y=PS50, color=strings[1]), size=1.7)+
-      geom_line(data = keep_predictions, aes(x=Time, y=PS500, color=strings[2]), size=1.7)+
-      
-      geom_point(data = exp_data, aes(x=Time, y=PS50, color=strings[1]), size=5)+
-      geom_point(data = exp_data, aes(x=Time, y=PS500, color=strings[2]), size=5)+
-      #scale_y_log10()+
-      
-      
-      labs(title = paste0("Fluorescence intensity in D.magna of mode ", k+1),
-           y = "Fluorescence intensity", x = "Time (hours)")+
+  draw_plot <- ggplot()+
+      geom_line(data = keep_predictions, aes(x=Time, y=BodyBurden), size=1.7)+
+      geom_point(data = PFAS, aes(x=Time, y=Concentration), size=5)+
+      labs(title = "PFOS body burden in D.magna",
+           y = "Body burden (ng/g WW)", x = "Time (days)")+
       theme(plot.title = element_text(hjust = 0.5,size=30), 
             axis.title.y =element_text(hjust = 0.5,size=25,face="bold"),
             axis.text.y=element_text(size=22),
@@ -300,53 +314,54 @@ plot_func <- function(optimization, list_of_experiments){
             legend.title=element_text(hjust = 0.5,size=25), 
             legend.text=element_text(size=22)) + 
       
-      scale_color_manual("PS type", values=cls)+
       theme(legend.key.size = unit(1.5, 'cm'),  
             legend.title = element_text(size=14),
             legend.text = element_text(size=14),
             axis.text = element_text(size = 14))
     print(draw_plot)
-    
-    
-  }
-  
-  
-  
 }
+  
 ##############################################################################
 
-
-list_of_experiments <- list("mode1" = mode1,"mode2" = mode2,
-                            "mode3" = mode3, "mode4" = mode4)
-
-x0 <- c(0.5, rep(c(5000,0.1), 8))
+x0 <- c(1e-04, 0.05)
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBPLX" , #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
               "xtol_rel" = 1e-07, 
               "ftol_rel" = 1e-07,
               "ftol_abs" = 0.0,
               "xtol_abs" = 0.0 ,
-              "maxeval" = 3000,
+              "maxeval" = 1000,
               "print_level" = 1)
-metric <- "PBKOF"
 optimization <- nloptr::nloptr(x0 = x0,
                                eval_f = obj_func,
-                               lb	= c(0,rep(0,16)),
-                               ub = c(1,rep(20000,16)),
+                               lb	= c(0,0),
+                               ub = c(100,100),
                                opts = opts,
-                               list_of_experiments=list_of_experiments,
-                               metric = metric)
+                               metric = "AAFE",
+                               PFAS = PFOS,
+                               Cwater = 0.005, #mg/L
+                               age = 1)
 
-fitted_params <- optimization$solution
-lag <- fitted_params[1]
-params_mode1 <- fitted_params[2:5]
-params_mode2 <- fitted_params[6:9]
-params_mode3 <- fitted_params[10:13]
-params_mode4 <- fitted_params[14:17]
-parameters <- data.frame(rbind(params_mode1,params_mode2,
-                               params_mode3, params_mode4))
-colnames(parameters) <- c("ku_PS50", "ke_PS50", "ku_PS500", "ke_PS500")
-rownames(parameters) <- c("mode1", "mode2", "mode3", "mode4")
+PFOS_params <- c("Fsorption" = optimization$solution[1],  
+                 "ke" = optimization$solution[2])
 
 
-plot_func(optimization, list_of_experiments)
+plot_func(optimization, PFAS = PFOS, Cwater = 0.005, age = 1)
+
+
+# Fitted parameters
+Fsorption <- PFOS_params["Fsorption"]
+ke <- PFOS_params["ke"]
+# Water concentration
+Cw <- 0.005 * 1e06 #ng/L
+exp_time <- PFOS$Time
+sol_times <- seq(0,round(max(PFOS$Time))+1, 0.01 )
+inits <- c('C_daphnia'= 0, "Cw" = Cw)
+params <- c("init_age"=1, "Fsorption"= Fsorption, "ke"  = ke)
+solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                    y = inits,
+                                    parms = params,
+                                    method="lsodes",
+                                    rtol = 1e-5, atol = 1e-5))
+
+
 
