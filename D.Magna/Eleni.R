@@ -253,7 +253,7 @@ obj_func <- function(x, PFAS, Cwater, age, metric){
     BodyBurden <- PFAS$Concentration
     exp_time <- PFAS$Time
     sol_times <- seq(0,round(max(PFAS$Time))+1, 0.01 )
-    inits <- c('C_daphnia'= 0, "Cw" = Cw)
+    inits <- c( "Cw" = Cw, 'C_daphnia'= 0)
     params <- c("init_age"=init_age, "Fsorption"= Fsorption, "ke"  = ke)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                           y = inits,
@@ -288,7 +288,7 @@ plot_func <- function(optimization, PFAS, Cwater, age){
   Cw <- Cwater * 1e06 #ng/L
   exp_time <- PFAS$Time
   sol_times <- seq(0,round(max(PFAS$Time))+1, 0.01 )
-  inits <- c('C_daphnia'= 0, "Cw" = Cw)
+  inits <- c( "Cw" = Cw, 'C_daphnia'= 0)
   params <- c("init_age"=init_age, "Fsorption"= Fsorption, "ke"  = ke)
   solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                       y = inits,
