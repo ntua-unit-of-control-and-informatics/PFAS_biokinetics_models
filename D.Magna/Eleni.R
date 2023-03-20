@@ -1,7 +1,7 @@
 # Working directory
 
-#setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
-setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
+setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
+#setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
 
 # Function for estimating length of D. magna based on age (from Betini et al. (2019))
 # Input: age [days], temperature [oC], food["low"/"high"]/ Output: length [mm]
@@ -128,7 +128,7 @@ rmse <- function(observed, predicted){
   sqrt(mean((observed-predicted)^2)) 
 }
 
-AAFE <- function(predictions, observations, times=NULL){
+AAFE <- function(observations, predictions, times=NULL){
   y_obs <- unlist(observations)
   y_pred <- unlist(predictions)
   # Total number of observations
@@ -267,7 +267,7 @@ obj_func <- function(x, PFAS, Cwater, age, metric){
         stop(print("Length of predictions is not equal to the length of data"))
       }
       if(metric == "AAFE"){
-        score <- AAFE(results,BodyBurden) 
+        score <- AAFE(BodyBurden, results) 
       }else if (metric =="rmse"){
         score <- rmse(BodyBurden, results)
       }else if(metric == "PBKOF"){
@@ -301,10 +301,10 @@ plot_func <- function(optimization, PFAS, Cwater, age){
   keep_predictions[,2] <- solution[,"C_daphnia"]
 
     
-  draw_plot <- ggplot()+
+      ggplot()+
       geom_line(data = keep_predictions, aes(x=Time, y=BodyBurden), size=1.7)+
       geom_point(data = PFAS, aes(x=Time, y=Concentration), size=5)+
-      labs(title = "PFOS body burden in D.magna",
+      labs(title = paste(substitute(PFAS),"body burden in D.magna", sep = " "),
            y = "Body burden (ng/g WW)", x = "Time (days)")+
       theme(plot.title = element_text(hjust = 0.5,size=30), 
             axis.title.y =element_text(hjust = 0.5,size=25,face="bold"),
@@ -318,7 +318,6 @@ plot_func <- function(optimization, PFAS, Cwater, age){
             legend.title = element_text(size=14),
             legend.text = element_text(size=14),
             axis.text = element_text(size = 14))
-    print(draw_plot)
 }
   
 ##############################################################################
@@ -331,7 +330,12 @@ opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBP
               "xtol_abs" = 0.0 ,
               "maxeval" = 1000,
               "print_level" = 1)
-optimization <- nloptr::nloptr(x0 = x0,
+
+#---------------------------------------------
+#.         PFOS
+#---------------------------------------------
+
+optimization_pfos <- nloptr::nloptr(x0 = x0,
                                eval_f = obj_func,
                                lb	= c(0,0),
                                ub = c(100,100),
@@ -341,11 +345,11 @@ optimization <- nloptr::nloptr(x0 = x0,
                                Cwater = 0.005, #mg/L
                                age = 1)
 
-PFOS_params <- c("Fsorption" = optimization$solution[1],  
-                 "ke" = optimization$solution[2])
+PFOS_params <- c("Fsorption" = optimization_pfos$solution[1],  
+                 "ke" = optimization_pfos$solution[2])
 
 
-plot_func(optimization, PFAS = PFOS, Cwater = 0.005, age = 1)
+plot_func(optimization_pfos, PFAS = PFOS, Cwater = 0.005, age = 1)
 
 
 # Fitted parameters
@@ -363,5 +367,157 @@ solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                     method="lsodes",
                                     rtol = 1e-5, atol = 1e-5))
 
+#---------------------------------------------
+#.         PFNA
+#---------------------------------------------
 
+optimization_pfna <- nloptr::nloptr(x0 = x0,
+                               eval_f = obj_func,
+                               lb	= c(0,0),
+                               ub = c(100,100),
+                               opts = opts,
+                               metric = "rmse",
+                               PFAS = PFNA,
+                               Cwater = 0.005, #mg/L
+                               age = 1)
+
+PFNA_params <- c("Fsorption" = optimization_pfna$solution[1],  
+                 "ke" = optimization_pfna$solution[2])
+
+
+plot_func(optimization_pfna, PFAS = PFNA, Cwater = 0.005, age = 1)
+
+
+# Fitted parameters
+Fsorption <- PFNA_params["Fsorption"]
+ke <- PFNA_params["ke"]
+# Water concentration
+Cw <- 0.005 * 1e06 #ng/L
+exp_time <- PFNA$Time
+sol_times <- seq(0,round(max(PFNA$Time))+1, 0.01 )
+inits <- c('C_daphnia'= 0, "Cw" = Cw)
+params_pfna <- c("init_age"=1, "Fsorption"= Fsorption, "ke"  = ke)
+solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                    y = inits,
+                                    parms = params_pfna,
+                                    method="lsodes",
+                                    rtol = 1e-5, atol = 1e-5))
+
+
+
+
+#---------------------------------------------
+#.         PFUnA
+#---------------------------------------------
+
+x0 <- c(1, 0.5)
+optimization_PFUnA <- nloptr::nloptr(x0 = x0,
+                                    eval_f = obj_func,
+                                    lb	= c(0,0),
+                                    ub = c(100,100),
+                                    opts = opts,
+                                    metric = "rmse",
+                                    PFAS = PFUnA,
+                                    Cwater = 0.005, #mg/L
+                                    age = 1)
+
+PFUnA_params <- c("Fsorption" = optimization_PFUnA$solution[1],  
+                 "ke" = optimization_PFUnA$solution[2])
+
+
+plot_func(optimization_PFUnA, PFAS = PFUnA, Cwater = 0.005, age = 1)
+
+
+# Fitted parameters
+Fsorption <- PFUnA_params["Fsorption"]
+ke <- PFUnA_params["ke"]
+# Water concentration
+Cw <- 0.005 * 1e06 #ng/L
+exp_time <- PFUnA$Time
+sol_times <- seq(0,round(max(PFUnA$Time))+1, 0.01 )
+inits <- c('C_daphnia'= 0, "Cw" = Cw)
+params_PFUnA <- c("init_age"=1, "Fsorption"= Fsorption, "ke"  = ke)
+solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                    y = inits,
+                                    parms = params_PFUnA,
+                                    method="lsodes",
+                                    rtol = 1e-5, atol = 1e-5))
+
+
+
+#---------------------------------------------
+#.         PFDA
+#---------------------------------------------
+
+x0 <- c(1, 0.5)
+optimization_PFDA <- nloptr::nloptr(x0 = x0,
+                                     eval_f = obj_func,
+                                     lb	= c(0,0),
+                                     ub = c(100,100),
+                                     opts = opts,
+                                     metric = "PBKOF",
+                                     PFAS = PFDA,
+                                     Cwater = 0.005, #mg/L
+                                     age = 1)
+
+PFDA_params <- c("Fsorption" = optimization_PFDA$solution[1],  
+                  "ke" = optimization_PFDA$solution[2])
+
+
+plot_func(optimization_PFDA, PFAS = PFDA, Cwater = 0.005, age = 1)
+
+
+# Fitted parameters
+Fsorption <- PFDA_params["Fsorption"]
+ke <- PFDA_params["ke"]
+# Water concentration
+Cw <- 0.005 * 1e06 #ng/L
+exp_time <- PFDA$Time
+sol_times <- seq(0,round(max(PFDA$Time))+1, 0.01 )
+inits <- c('C_daphnia'= 0, "Cw" = Cw)
+params_PFDA <- c("init_age"=1, "Fsorption"= Fsorption, "ke"  = ke)
+solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                    y = inits,
+                                    parms = params_PFDA,
+                                    method="lsodes",
+                                    rtol = 1e-5, atol = 1e-5))
+
+
+
+#---------------------------------------------
+#.         PFOA
+#---------------------------------------------
+
+x0 <- c(1, 0.5)
+optimization_PFOA <- nloptr::nloptr(x0 = x0,
+                                     eval_f = obj_func,
+                                     lb	= c(0,0),
+                                     ub = c(100,100),
+                                     opts = opts,
+                                     metric = "rmse",
+                                     PFAS = PFOA,
+                                     Cwater = 0.005, #mg/L
+                                     age = 1)
+
+PFOA_params <- c("Fsorption" = optimization_PFOA$solution[1],  
+                  "ke" = optimization_PFOA$solution[2])
+
+
+plot_func(optimization_PFOA, PFAS = PFOA, Cwater = 0.005, age = 1)
+
+
+# Fitted parameters
+Fsorption <- PFOA_params["Fsorption"]
+ke <- PFOA_params["ke"]
+# Water concentration
+Cw <- 0.005 * 1e06 #ng/L
+exp_time <- PFOA$Time
+sol_times <- seq(0,round(max(PFOA$Time))+1, 0.01 )
+inits <- c('C_daphnia'= 0, "Cw" = Cw)
+params_PFOA <- c("init_age"=1, "Fsorption"= Fsorption, "ke"  = ke)
+solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                    y = inits,
+                                    parms = params_PFOA,
+                                    method="lsodes",
+                                    rtol = 1e-5, atol = 1e-5))
 
