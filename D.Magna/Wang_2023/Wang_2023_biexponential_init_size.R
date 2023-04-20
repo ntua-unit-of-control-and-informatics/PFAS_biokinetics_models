@@ -194,10 +194,10 @@ ode_func <- function(time, inits, params){
     
     age <- init_age + time
     #size in mm
-    size <- Size_estimation(age, temperature = Temp, food="high")
+    size <- Size_estimation(age, temperature = 23, food="high")
     
     # Filtation rate in mL/h
-    Frate <- Filtration_rate_estimation(size, temperature = Temp, method = "Preuss")
+    Frate <- Filtration_rate_estimation(size, temperature = 23, method = "Preuss")
     # Filtation rate in L/day
     Frate <- Frate * 24/1000
     
@@ -242,7 +242,6 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, metric)
     # Iterate over PFAS names 
     # Load PFAS data
     df <- PFAS_data[[PFAS_name]]
-    lag <- x[length(x)]
     # Iterate over number of distinct temperature used in the experiment
     for (temp_iter in 1:length(temperatures)){
          # Initial water concentration of PFAS at selected temperature
@@ -255,11 +254,20 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, metric)
          BodyBurden <- df[!is.na(df[,BB_index[temp_iter]]),BB_index[temp_iter]]
          # Time used by numerical solver that integrates the system of ODE
          sol_times <- seq(0,29, 0.01 )
-         # Fitted parameters
+         if (PFAS_names[i] %in% c("PFBA", "PFBS", "PFPeA", "PFHxA", "PFHpA")){
+           # Fitted parameters
+         lag <- x[length(x)]
          alpha <- x[counter]
          ke1 <- x[counter+1]
          ke2 <- x[counter+2]
          counter <- counter + 3
+         }else{
+           lag <- 0
+           alpha <- x[counter]
+           ke1 <- 0
+           ke2 <- x[counter+1]
+           counter <- counter + 2
+         }
          inits <- c( "Cw" = C_water, 'C_daphnia'= 0)
          params <- c("init_age"=init_age, "Temp" = Temp, "alpha"= alpha, 
                      "ke1"  = ke1,"ke2"  = ke2,  "lag" = lag)
@@ -365,7 +373,7 @@ opts <- list( "algorithm" = "NLOPT_LN_SBPLX",#"NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUO
               "ftol_rel" = 1e-06,
               "ftol_abs" = 0.0,
               "xtol_abs" = 0.0 ,
-              "maxeval" = 1000,
+              "maxeval" = 10,
               "print_level" = 1)
 
 # Input preparation
@@ -388,29 +396,54 @@ solutions <- list()
 # List to store optimization results
 optimizations <- list()
 for (i in 1:length(PFAS_names)){
-  # Define initial values of fitted parameters to provide to the optimization routine
-  # For each PFAS and temperature combination we have two parameters
-  x0 <- c(rep(c(0.1, 1, 2),length(temperatures)), 3)
-  optimization<- nloptr::nloptr(x0 = x0,
-                                 eval_f = obj_func,
-                                 lb	= rep(0,length(x0)),
-                                 ub = c(rep(c(2,20,20),length(temperatures)),10),
-                                 opts = opts,
-                                 PFAS_data = data_ls,
-                                 PFAS_name = PFAS_names[i],
-                                 Cwater = Cwater,
-                                 age = age ,
-                                 temperatures = temperatures,
-                                 metric = "rmse")
-  optimizations[[PFAS_names[i]]] <- optimization
-  parameters[[PFAS_names[i]]] <- list(
-                   "pars" = matrix(optimization$solution[1:length(optimization$solution)-1], ncol = 3,
-                                      dimnames = list(c("alpha", "ke1", "ke2"),
-                                                    c("16oC", "20oC", "24oC"))),
-                   "lag" =  optimization$solution[length(optimization$solution)])
-  sol_times <- seq(0,15, 0.01 )
-  # Iterate over number of distinct temperature used in the experiment
-  temp_iter <- 2
+  #short chain PFAS behave differently and follow biexponential
+  if (PFAS_names[i] %in% c("PFBA", "PFBS", "PFPeA", "PFHxA", "PFHpA")){
+    # Define initial values of fitted parameters to provide to the optimization routine
+    # For each PFAS and temperature combination we have two parameters
+    x0 <- c(rep(c(0.1, 1, 2),length(temperatures)), 3)
+    optimization<- nloptr::nloptr(x0 = x0,
+                                   eval_f = obj_func,
+                                   lb	= rep(0,length(x0)),
+                                   ub = c(rep(c(2,20,20),length(temperatures)),10),
+                                   opts = opts,
+                                   PFAS_data = data_ls,
+                                   PFAS_name = PFAS_names[i],
+                                   Cwater = Cwater,
+                                   age = age ,
+                                   temperatures = temperatures,
+                                   metric = "rmse")
+    optimizations[[PFAS_names[i]]] <- optimization
+    parameters[[PFAS_names[i]]] <- list(
+                     "pars" = matrix(optimization$solution[1:length(optimization$solution)-1], ncol = 3,
+                                        dimnames = list(c("alpha", "ke1", "ke2"),
+                                                      c("16oC", "20oC", "24oC"))),
+                     "lag" =  optimization$solution[length(optimization$solution)])
+  
+  }else{
+    # Define initial values of fitted parameters to provide to the optimization routine
+    # For each PFAS and temperature combination we have two parameters
+    x0 <- c(rep(c(0.1, 1),length(temperatures)))
+    optimization<- nloptr::nloptr(x0 = x0,
+                                  eval_f = obj_func,
+                                  lb	= rep(0,length(x0)),
+                                  ub = c(rep(c(2,20),length(temperatures))),
+                                  opts = opts,
+                                  PFAS_data = data_ls,
+                                  PFAS_name = PFAS_names[i],
+                                  Cwater = Cwater,
+                                  age = age ,
+                                  temperatures = temperatures,
+                                  metric = "rmse")
+    optimizations[[PFAS_names[i]]] <- optimization
+    parameters[[PFAS_names[i]]] <- list(
+      "pars" = matrix(c(optimization$solution[1],0, optimization$solution[2:3], 0,
+                    optimization$solution[4:5], 0, optimization$solution[6]), ncol = 3,
+                      dimnames = list(c("alpha", "ke1", "ke2"),
+                                      c("16oC", "20oC", "24oC"))), "lag" =  0)
+    }
+    sol_times <- seq(0,15, 0.01 )
+    # Iterate over number of distinct temperature used in the experiment
+    temp_iter <- 2
     # Initial water concentration of PFAS at selected temperature
     C_water <-  Cwater[PFAS_names[i],temp_iter]
     # Temperature of experiment
@@ -424,16 +457,13 @@ for (i in 1:length(PFAS_names)){
     params <- c("init_age"=age, "Temp" = Temp, "alpha"= alpha, "ke1"  = ke1,
                 "ke2"  = ke2, "lag" = lag)
     solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
-                                        y = inits,
-                                        parms = params,
-                                        method="lsodes",
-                                        rtol = 1e-5, atol = 1e-5))
+                                                          y = inits,
+                                                          parms = params,
+                                                          method="lsodes",
+                                                          rtol = 1e-5, atol = 1e-5))
     
-  
-  plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_ls, PFAS_name  = PFAS_names[i], 
-            Cwater = Cwater, age = age,  temperatures = temperatures )
-
+    
+    plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_ls, PFAS_name  = PFAS_names[i], 
+              Cwater = Cwater, age = age,  temperatures = temperatures )
 }
-
-
 
