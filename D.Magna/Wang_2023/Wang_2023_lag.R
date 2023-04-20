@@ -257,9 +257,11 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, metric)
          # Fitted parameters
          Fsorption <- x[counter]
          ke <- x[counter+1]
-         counter <- counter + 2
+         lag <- x[counter+2]
+         counter <- counter + 3
          inits <- c( "Cw" = C_water, 'C_daphnia'= 0)
-         params <- c("init_age"=init_age, "Temp" = Temp, "Fsorption"= Fsorption, "ke"  = ke)
+         params <- c("init_age"=init_age, "Temp" = Temp, "Fsorption"= Fsorption, 
+                     "ke"  = ke, "lag" = lag)
          solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                              y = inits,
                                              parms = params,
@@ -313,8 +315,11 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures){
       # Fitted parameters
       Fsorption <- parameters[1,temp_iter]
       ke <-  parameters[2,temp_iter]
+      lag <-  parameters[3,temp_iter]
+      
       inits <- c( "Cw" = C_water, 'C_daphnia'= 0)
-      params <- c("init_age"=init_age, "Temp" = Temp, "Fsorption"= Fsorption, "ke"  = ke)
+      params <- c("init_age"=init_age, "Temp" = Temp, "Fsorption"= Fsorption, 
+                  "ke"  = ke, "lag" = lag)
       solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                           y = inits,
                                           parms = params,
@@ -353,7 +358,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures){
   
 ##############################################################################
 
-opts <- list( "algorithm" = "NLOPT_LN_NEWUOA",#"NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBPLX" , #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
+opts <- list( "algorithm" = "NLOPT_LN_SBPLX",#"NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBPLX" , #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
               "xtol_rel" = 1e-06, 
               "ftol_rel" = 1e-06,
               "ftol_abs" = 0.0,
@@ -372,7 +377,7 @@ colnames(Cwater) <-  c("16oC", "20oC", "24oC")
 rownames(Cwater) <- PFAS_names
 # Convert water concentration in ng/L
 Cwater = Cwater*1000
-age = 7+7 # age of D.magna at the beginning of exposure in days
+age = 7 # age of D.magna at the beginning of exposure in days
 temperatures <- c(16, 20, 24) #experiment temperature in oC 
 # List to store parameters
 parameters <- list()
@@ -397,11 +402,11 @@ for (i in 1:length(PFAS_names)){
                                  metric = "PBKOF")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- matrix(optimization$solution, ncol = 3,
-                                      dimnames = list(c("Fsoprtion", "ke"),
+                                      dimnames = list(c("Fsoprtion", "ke", "lag"),
                                                     c("16oC", "20oC", "24oC")))
   sol_times <- seq(0,15, 0.01 )
   # Iterate over number of distinct temperature used in the experiment
-  for (temp_iter in 1:length(temperatures)){
+  temp_iter <- 2
     # Initial water concentration of PFAS at selected temperature
     C_water <-  Cwater[PFAS_names[i],temp_iter]
     # Temperature of experiment
@@ -409,16 +414,16 @@ for (i in 1:length(PFAS_names)){
     # Fitted parameters
     Fsorption <- parameters[[PFAS_names[i]]][1,temp_iter]
     ke <-  parameters[[PFAS_names[i]]][2,temp_iter]
+    lag <-  parameters[[PFAS_names[i]]][3,temp_iter]
     inits <- c( "Cw" = C_water, 'C_daphnia'= 0)
-    params <- c("init_age"=init_age, "Temp" = Temp, "Fsorption"= Fsorption, "ke"  = ke)
+    params <- c("init_age"=age, "Temp" = Temp, "Fsorption"= Fsorption, "ke"  = ke, "lag" = lag)
     solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
                                         rtol = 1e-5, atol = 1e-5))
     
-    predictions[,temp_iter+1] <- solution$C_daphnia
-  }
+  
   plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_ls, PFAS_name  = PFAS_names[i], 
             Cwater = Cwater, age = age,  temperatures = temperatures )
 
