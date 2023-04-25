@@ -405,11 +405,11 @@ for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[i]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
-  x0 <- c(1, 1, 1, 1)
+  x0 <- c(-1, 2.5, -2, 0.5)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(-2,2,-3,0),
-                                ub = c(0, 4,-1,1),
+                                lb	=  c(-2,2,-3,-2),
+                                ub = c(0, 5,-1,1),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
