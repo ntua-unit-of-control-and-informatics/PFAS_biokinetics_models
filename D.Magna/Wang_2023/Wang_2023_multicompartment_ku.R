@@ -204,7 +204,6 @@ ode_func <- function(time, inits, params){
     # Water concentration in ng/L
     dCw <- 0
     # D.magna concentration in lumenconcentration in ng/g
-     <- 0
     dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_daphnia_unbound - koff*C_daphnia_bound
     C_tot <- C_daphnia_unbound + C_daphnia_bound

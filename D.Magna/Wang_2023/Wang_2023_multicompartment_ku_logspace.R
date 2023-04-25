@@ -206,8 +206,14 @@ ode_func <- function(time, inits, params){
     # D.magna concentration in lumenconcentration in ng/g
     ku <- 10^ku
     ke <- 10^ke
-    kon <- 10^kon
-    koff <- 10^koff
+    # Reported values for Kon and koff range between 1e2-1e04 and 1e-3-1e-1 in L/mol/s 
+    # and s-^-1 respectively. Our concentrations are in ng/g. Assuming density = 1000g/L
+    # then the concentration in ng/g is multyplied by 1000 to make it ng/L and then by
+    # multiply by 1e-9 to make it grams and divide by MW. We do this directly to kon 
+    # and koff to make the concentration mol/L so that we can match the literature 
+    # values of kon and koff with ours
+    kon <- (10^kon)*1000*1e-09/MW
+    koff <- (10^koff)*1000*1e-09/MW
     dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_daphnia_unbound - koff*C_daphnia_bound
     C_tot <- C_daphnia_unbound + C_daphnia_bound
@@ -219,7 +225,7 @@ ode_func <- function(time, inits, params){
 
 
 
-obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, metric){
+obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, metric){
   
   # Indexes of body burden and exposure time in data frame
   BB_index <- c(2,4,6)
@@ -255,7 +261,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, metric)
     inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
                 "C_daphnia_bound" = 0)
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke)
+                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -285,7 +291,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, metric)
 
 
 
-plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures){
+plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
   setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace")
   
@@ -318,7 +324,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures){
     inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
                 "C_daphnia_bound" = 0)
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke)
+                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -362,7 +368,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures){
 sheet_names <- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA", 
                  "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
 PFAS_names <- sheet_names
-
+Molecular_weights <- c(214, 570, 330, 414, 514, 614, 364, 314, 464, 414, 500, 264, 564)
 data_ls <- list()
 data_plot <- list()
 
@@ -396,21 +402,21 @@ solutions <- list()
 # List to store optimization results
 optimizations <- list()
 for (i in 1:length(PFAS_names)){
-  #short chain PFAS behave differently and follow biexponential
-  
+  MW <- Molecular_weights[i]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
   x0 <- c(1, 1, 1, 1)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(-3,-8,-8,-3),
-                                ub = c(3, 10,10,3),
+                                lb	=  c(-2,2,-3,1),
+                                ub = c(0, 4,-1,1),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
                                 Cwater = Cwater,
                                 age = age ,
                                 temperatures = temperatures,
+                                MW = MW,
                                 metric = "PBKOF")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution
@@ -432,7 +438,7 @@ for (i in 1:length(PFAS_names)){
   inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
               "C_daphnia_bound" = 0)
   params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-              "kon" = kon, "koff" = koff, "ke"= ke)
+              "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
   solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                                         y = inits,
                                                         parms = params,
@@ -441,6 +447,6 @@ for (i in 1:length(PFAS_names)){
   
   
   plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_plot, PFAS_name  = PFAS_names[i], 
-            Cwater = Cwater, age = age,  temperatures = temperatures )
+            Cwater = Cwater, age = age,  temperatures = temperatures, MW = MW )
 }
 
