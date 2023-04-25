@@ -299,7 +299,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
 
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace_reduced")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -381,7 +381,7 @@ data_ls <- list()
 data_plot <- list()
 
 for(sheet_name in sheet_names){
-  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced.xlsx', sheet = sheet_name)
   data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
 }
 
