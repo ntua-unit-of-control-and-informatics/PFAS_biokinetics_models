@@ -214,7 +214,11 @@ ode_func <- function(time, inits, params){
     # values of kon and koff with ours
     kon <- (10^kon)*1000*1e-09/MW
     koff <- (10^koff)*1000*1e-09/MW
-    dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound - ke*C_daphnia_unbound
+    if (time < lag){
+      dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound 
+    }else{
+      dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound - ke*C_daphnia_unbound
+    }
     dC_daphnia_bound <- kon*C_daphnia_unbound - koff*C_daphnia_bound
     C_tot <- C_daphnia_unbound + C_daphnia_bound
     return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
@@ -244,6 +248,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
   kon <- x[2]
   koff <- x[3]
   ke <- x[4]
+  lag <- x[5]
   for (temp_iter in 1:length(temperatures)){
     # Initial water concentration of PFAS at selected temperature
     C_water <-  Cwater[PFAS_name,temp_iter]
@@ -260,8 +265,9 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
     
     inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
                 "C_daphnia_bound" = 0)
+    
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW, "lag" = lag)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -313,6 +319,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
   kon <-  parameters[2]
   koff <-  parameters[3]
   ke <- parameters[4]
+  lag <- parameters[5]
   # Iterate over number of distinct temperature used in the experiment
   for (temp_iter in 1:length(temperatures)){
     # Initial water concentration of PFAS at selected temperature
@@ -323,8 +330,9 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
     
     inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
                 "C_daphnia_bound" = 0)
+    
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW, "lag" = lag)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -438,7 +446,7 @@ for (i in 1:length(PFAS_names)){
   inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
               "C_daphnia_bound" = 0)
   params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-              "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+              "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW, "lag" = lag)
   solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                                         y = inits,
                                                         parms = params,
