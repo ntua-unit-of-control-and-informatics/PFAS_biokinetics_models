@@ -414,7 +414,7 @@ for (i in 1:length(PFAS_names)){
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
                                 lb	=  c(-3,3,-5,-2, 0.1*1e-06),
-                                ub = c(0, 8,-3,1,  1e-03),
+                                ub = c(0, 8,-3,1,  1e-01),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
