@@ -206,22 +206,13 @@ ode_func <- function(time, inits, params){
     # D.magna concentration in lumenconcentration in ng/g
     ku <- 10^ku
     ke <- 10^ke
-    kon <- 10^kon
-    koff <- 10^koff
-    # Reported values for Kon and koff range between 1e2-1e04 and 1e-3-1e-1 in L/mol/s 
-    # and s-^-1 respectively. Our concentrations are in ng/g. Assuming density = 1000g/L
-    # then the concentration in ng/g is multyplied by 1000 to make it ng/L and then by
-    # multiply by 1e-9 to make it grams and divide by MW. We do this directly to kon 
-    # and koff to make the concentration mol/L so that we can match the literature 
-    # values of kon and koff with ours
-    C_daphnia_unbound_mol <- C_daphnia_unbound*1000*1e-09/MW
-    C_daphnia_bound_mol <- C_daphnia_bound*1000*1e-09/MW
-    dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound - ke*C_daphnia_unbound
-    dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
-    dC_prot_un <-  koff*C_daphnia_bound_mol -  kon*C_prot_un*C_daphnia_unbound_mol
-    C_tot <- C_daphnia_unbound + C_daphnia_bound
+    CL <- 10^CL
+    Kreabs <- 10^Kreabs
+    dC_daphnia_unbound <-  ku*Cw/WW  + Kreabs*C_daphnia_storage - ke*C_daphnia_unbound
+    dC_daphnia_storage <-  ke*C_daphnia_unbound- - Kreabs*C_daphnia_storage - CL*C_daphnia_storage 
+    C_tot <- C_daphnia_unbound + C_daphnia_storage
     return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
-                  "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un), "Frate" = Frate,
+                  "dC_daphnia_storage" = dC_daphnia_storage), "Frate" = Frate,
                 "WW" = WW, "C_tot" = C_tot))
   })
 }
@@ -244,10 +235,9 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
   df <- PFAS_data[[PFAS_name]]
   # Iterate over number of distinct temperature used in the experiment
   ku <- x[1]
-  kon <- x[2]
-  koff <- x[3]
+  CL <- x[2]
+  Kreabs <- x[3]
   ke <- x[4]
-  C_prot_init <- x[5]
   for (temp_iter in 1:length(temperatures)){
     # Initial water concentration of PFAS at selected temperature
     C_water <-  Cwater[PFAS_name,temp_iter]
@@ -262,11 +252,10 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
     # Fitted parameters
     
     
-    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
-                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
-    
+    inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
+                "C_daphnia_storage" = 0)
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+                "CL" = CL, "Kreabs" = Kreabs, "ke"= ke)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -274,7 +263,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
                                         rtol = 1e-5, atol = 1e-5))
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
-      results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
+      results <- solution[which(round(solution$time,2) %in% exp_time), 'C_daphnia_unbound']
     }else{
       stop(print("Length of predictions is not equal to the length of data"))
     }
@@ -298,7 +287,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
 
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/protein")
+  setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/reabsorb")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -315,10 +304,9 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
   predictions <- data.frame("time" = sol_times, "BB_16" = rep(NA, length(sol_times)),
                             "BB_20" = rep(NA, length(sol_times)), "BB_24" = rep(NA, length(sol_times)))
   ku <- parameters[1]
-  kon <-  parameters[2]
-  koff <-  parameters[3]
+  CL <-  parameters[2]
+  Kreabs <-  parameters[3]
   ke <- parameters[4]
-  C_prot_init <- unname(parameters[5])
   # Iterate over number of distinct temperature used in the experiment
   for (temp_iter in 1:length(temperatures)){
     # Initial water concentration of PFAS at selected temperature
@@ -327,18 +315,17 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
     Temp <- temperatures[temp_iter]
     # Fitted parameters
     
-    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
-                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
-    
+    inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
+                "C_daphnia_storage" = 0)
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+                "CL" = CL, "Kreabs" = Kreabs, "ke"= ke)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
                                         rtol = 1e-5, atol = 1e-5))
     
-    predictions[,temp_iter+1] <- solution$C_tot
+    predictions[,temp_iter+1] <- solution$C_daphnia_unbound
   }
   ggplot()+
     geom_line(data = predictions, aes(x=time, y=BB_16,  colour = "16oC"), size=1.7)+
@@ -412,11 +399,11 @@ for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[i]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
-  x0 <- c(1.5, 5, -3, 0.1, 500*1e-06)
+  x0 <- c(0, 0, 0, 0)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(-1, 2,-7,-5, 1*1e-06),
-                                ub =   c(3, 9, 1, 1,  10000*1e-06),
+                                lb	=  c(-7, -7,-7,-7),
+                                ub =   c(7, 7, 7, 7),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
@@ -427,7 +414,7 @@ for (i in 1:length(PFAS_names)){
                                 metric = "PBKOF")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution
-  names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","koff", "ke", "C_prot_init")
+  names(parameters[[PFAS_names[i]]]) = c("ku",  "CL","Kreabs", "ke")
   
   sol_times <- seq(0,15, 0.01 )
   # Iterate over number of distinct temperature used in the experiment
@@ -438,15 +425,15 @@ for (i in 1:length(PFAS_names)){
   Temp <- temperatures[temp_iter]
   # Fitted parameters
   ku <- parameters[[PFAS_names[i]]][1]
-  kon <-  parameters[[PFAS_names[i]]][2]
-  koff <-  parameters[[PFAS_names[i]]][3]
+  CL <-  parameters[[PFAS_names[i]]][2]
+  Kreabs <-  parameters[[PFAS_names[i]]][3]
   ke <- parameters[[PFAS_names[i]]][4]
-  C_prot_init <- unname(parameters[[PFAS_names[i]]][5])
+  Fu <- parameters[[PFAS_names[i]]][5]
   
   inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
-              "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
+              "C_daphnia_storage" = 0)
   params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-              "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+              "CL" = CL, "Kreabs" = Kreabs, "ke"= ke, "MW" = MW)
   solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                                         y = inits,
                                                         parms = params,

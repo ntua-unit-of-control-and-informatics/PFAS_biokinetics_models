@@ -207,7 +207,8 @@ ode_func <- function(time, inits, params){
     ku <- 10^ku
     ke <- 10^ke
     kon <- 10^kon
-    koff <- 10^koff
+    Ka <- 10^Ka
+    koff <- kon/Ka
     # Reported values for Kon and koff range between 1e2-1e04 and 1e-3-1e-1 in L/mol/s 
     # and s-^-1 respectively. Our concentrations are in ng/g. Assuming density = 1000g/L
     # then the concentration in ng/g is multyplied by 1000 to make it ng/L and then by
@@ -216,9 +217,9 @@ ode_func <- function(time, inits, params){
     # values of kon and koff with ours
     C_daphnia_unbound_mol <- C_daphnia_unbound*1000*1e-09/MW
     C_daphnia_bound_mol <- C_daphnia_bound*1000*1e-09/MW
-    dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_daphnia_unbound +  koff*C_daphnia_bound - ke*C_daphnia_unbound
+    dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_prot_un*C_daphnia_unbound +   koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
-    dC_prot_un <-  koff*C_daphnia_bound_mol -  kon*C_prot_un*C_daphnia_unbound_mol
+    dC_prot_un <-   koff*C_daphnia_bound_mol -  kon*C_prot_un*C_daphnia_unbound_mol
     C_tot <- C_daphnia_unbound + C_daphnia_bound
     return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
                   "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un), "Frate" = Frate,
@@ -245,7 +246,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
   # Iterate over number of distinct temperature used in the experiment
   ku <- x[1]
   kon <- x[2]
-  koff <- x[3]
+  Ka <- x[3]
   ke <- x[4]
   C_prot_init <- x[5]
   for (temp_iter in 1:length(temperatures)){
@@ -266,12 +267,12 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
                 "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
     
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+                "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-5, atol = 1e-5))
+                                        rtol = 1e-3, atol = 1e-3))
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
@@ -310,13 +311,13 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
   # Load parameters
   parameters <- params
   # Time used by numerical solver that integrates the system of ODE
-  sol_times <- seq(0,15, 0.01 )
+  sol_times <- seq(0,15, 0.1 )
   # Data frame to store predictions for each temperature
   predictions <- data.frame("time" = sol_times, "BB_16" = rep(NA, length(sol_times)),
                             "BB_20" = rep(NA, length(sol_times)), "BB_24" = rep(NA, length(sol_times)))
   ku <- parameters[1]
   kon <-  parameters[2]
-  koff <-  parameters[3]
+  Ka <-  parameters[3]
   ke <- parameters[4]
   C_prot_init <- unname(parameters[5])
   # Iterate over number of distinct temperature used in the experiment
@@ -331,7 +332,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
                 "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
     
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+                "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -375,7 +376,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
 sheet_names <- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA", 
                  "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
 PFAS_names <- sheet_names
-Molecular_weights <- c(214, 570, 330, 414, 514, 614, 364, 314, 464, 414, 500, 264, 564)
+Molecular_weights <- c(214, 570, 330, 300, 514, 614, 364, 314,464, 414, 500,  364, 564)
 data_ls <- list()
 data_plot <- list()
 
@@ -412,11 +413,11 @@ for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[i]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
-  x0 <- c(1.5, 5, -3, 0.1, 500*1e-06)
+  x0 <- c(1.5, 5, 5, 0, 500*1e-06)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(-1, 2,-7,-5, 1*1e-06),
-                                ub =   c(3, 9, 1, 1,  10000*1e-06),
+                                lb	=  c(-3,2,4,-3, 0.1*1e-06),
+                                ub =   c(3, 6, 6, 3,  1000*1e-06),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
@@ -427,7 +428,7 @@ for (i in 1:length(PFAS_names)){
                                 metric = "PBKOF")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution
-  names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","koff", "ke", "C_prot_init")
+  names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","Ka", "ke", "C_prot_init")
   
   sol_times <- seq(0,15, 0.01 )
   # Iterate over number of distinct temperature used in the experiment
@@ -439,14 +440,14 @@ for (i in 1:length(PFAS_names)){
   # Fitted parameters
   ku <- parameters[[PFAS_names[i]]][1]
   kon <-  parameters[[PFAS_names[i]]][2]
-  koff <-  parameters[[PFAS_names[i]]][3]
+  Ka <-  parameters[[PFAS_names[i]]][3]
   ke <- parameters[[PFAS_names[i]]][4]
   C_prot_init <- unname(parameters[[PFAS_names[i]]][5])
   
   inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
               "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
   params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-              "kon" = kon, "koff" = koff, "ke"= ke, "MW" = MW)
+              "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
   solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                                         y = inits,
                                                         parms = params,
