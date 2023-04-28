@@ -180,19 +180,14 @@ ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
     
     # Units explanation:
-    # C_daphnia: ng PFAS/g D.magna WW
+    # C_daphnia: mol PFAS/L daphnia
     # ke: 1/h
-    # Cw: ng/L
-    # Fsorption:  L/day/ gWW
-    
+    # Cw: mol/L
+
     age <- init_age + time
     #size in mm
     size <- Size_estimation(age, temperature = 23, food="high")
     
-    # Filtation rate in mL/h
-    Frate <- Filtration_rate_estimation(size, temperature = 23, method = "Preuss")
-    # Filtation rate in L/day
-    Frate <- Frate * 24/1000
     
     # dry weight mg
     DW <- dry_weight_estimation(size)
@@ -215,14 +210,14 @@ ode_func <- function(time, inits, params){
     # multiply by 1e-9 to make it grams and divide by MW. We do this directly to kon 
     # and koff to make the concentration mol/L so that we can match the literature 
     # values of kon and koff with ours
-    C_daphnia_unbound_mol <- C_daphnia_unbound*1000*1e-09/MW
-    C_daphnia_bound_mol <- C_daphnia_bound*1000*1e-09/MW
-    dC_daphnia_unbound <-  ku*Cw/WW  - kon*C_prot_un*C_daphnia_unbound +   koff*C_daphnia_bound - ke*C_daphnia_unbound
+    C_daphnia_unbound_unmol <- C_daphnia_unbound*MW/(1000*1e-09)
+    C_daphnia_bound_unmol <- C_daphnia_bound*MW/(1000*1e-09)
+    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/WW  - kon*C_prot_un*C_daphnia_unbound +   koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
-    dC_prot_un <-   koff*C_daphnia_bound_mol -  kon*C_prot_un*C_daphnia_unbound_mol
-    C_tot <- C_daphnia_unbound + C_daphnia_bound
+    dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
+    C_tot <- C_daphnia_unbound_unmol + C_daphnia_bound_unmol
     return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
-                  "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un), "Frate" = Frate,
+                  "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un), 
                 "WW" = WW, "C_tot" = C_tot))
   })
 }
@@ -255,11 +250,11 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
     # Temperature of experiment
     Temp <- temperatures[temp_iter]
     # Time of measurement of selected PFAS at selected temperature
-    exp_time <- round(df[!is.na(df[,ExpTime_index[temp_iter]]),ExpTime_index[temp_iter]],2)
+    exp_time <- round(df[!is.na(df[,ExpTime_index[temp_iter]]),ExpTime_index[temp_iter]],1)
     # Body burden of selected PFAS at selected temperature
     BodyBurden <- df[!is.na(df[,BB_index[temp_iter]]),BB_index[temp_iter]]
     # Time used by numerical solver that integrates the system of ODE
-    sol_times <- seq(0,29, 0.01 )
+    sol_times <- seq(0,15, 0.1 )
     # Fitted parameters
     
     
@@ -272,7 +267,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-3, atol = 1e-3))
+                                        rtol = 1e-5, atol = 1e-5))
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
@@ -299,7 +294,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
 
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/protein/rmse")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/protein/molar")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -381,16 +376,16 @@ data_ls <- list()
 data_plot <- list()
 
 for(sheet_name in sheet_names){
-  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
   data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
 }
 
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX",#"NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBPLX" , #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-              "xtol_rel" = 1e-07, 
-              "ftol_rel" = 1e-07,
+              "xtol_rel" = 1e-08, 
+              "ftol_rel" = 1e-08,
               "ftol_abs" = 0.0,
               "xtol_abs" = 0.0 ,
-              "maxeval" = 1500,
+              "maxeval" = 3000,
               "print_level" = 1)
 
 # Water concentration in ng/mL
@@ -413,19 +408,20 @@ for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[i]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
-  x0 <- c(-1, 7, 4, -1, 1e-02)
+  #x0 <- c(8, 5, 5, 7, 1e-05)
+  x0 <- c(7, 6, 6, 8, 1e-05)# For PFBS
   set.seed(12312)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(-2,2,2,-2, 1e-09),
-                                ub =   c(2, 8, 6, 2,  1),
+                                lb	=  c(5,-1,1,5, 1e-07),
+                                ub =   c(12,10, 9, 12,  1e-03),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
                                 Cwater = Cwater,
                                 age = age ,
                                 temperatures = temperatures,
-                                MW = MW,
+                                MW = MW,s
                                 metric = "rmse")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution

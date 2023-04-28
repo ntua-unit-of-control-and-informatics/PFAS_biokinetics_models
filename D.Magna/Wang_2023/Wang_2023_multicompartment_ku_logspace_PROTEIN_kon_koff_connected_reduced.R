@@ -299,7 +299,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
 
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/protein/rmse")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/protein/reduced")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -381,7 +381,7 @@ data_ls <- list()
 data_plot <- list()
 
 for(sheet_name in sheet_names){
-  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
   data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
 }
 
@@ -413,12 +413,12 @@ for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[i]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
-  x0 <- c(-1, 7, 4, -1, 1e-02)
+  x0 <- c(-1, 3, 3, -1, 1e-07)
   set.seed(12312)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(-2,2,2,-2, 1e-09),
-                                ub =   c(2, 8, 6, 2,  1),
+                                lb	=  c(-2,-1,2,-2, 1e-09),
+                                ub =   c(2, 8, 6, 2,  1e-05),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
@@ -426,7 +426,7 @@ for (i in 1:length(PFAS_names)){
                                 age = age ,
                                 temperatures = temperatures,
                                 MW = MW,
-                                metric = "rmse")
+                                metric = "PBKOF")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution
   names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","Ka", "ke", "C_prot_init")
