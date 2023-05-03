@@ -421,7 +421,7 @@ for (i in 1:length(PFAS_names)){
                                 Cwater = Cwater,
                                 age = age ,
                                 temperatures = temperatures,
-                                MW = MW,s
+                                MW = MW,
                                 metric = "rmse")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution
