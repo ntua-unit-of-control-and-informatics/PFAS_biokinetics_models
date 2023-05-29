@@ -1,90 +1,7 @@
 # Working directory
 
-#setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna")
-setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
-#setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
-
-# Function for estimating length of D. magna based on age (from Betini et al. (2019))
-# Input: age [days], temperature [oC], food["low"/"high"]/ Output: length [mm]
-# Considers female D. magna
-Size_estimation <<- function(age, temperature = 22, food="high"){
-  
-  # T = 15 o C
-  a_low_15 <-0.354
-  b_low_15 <- 0.527
-  a_high_15 <- 0.105
-  b_high_15 <- 0.953
-  
-  # T = 25 o C
-  a_low_25 <- 0.811
-  b_low_25 <- 0.355
-  a_high_25 <- 0.698
-  b_high_25 <- 0.83
-  
-  if(food == "low"){
-    if(temperature <= 15){
-      a <- a_low_15
-      b <- b_low_15
-    }else if(temperature >= 25){  
-      a <- a_low_25
-      b <- b_low_25
-    }else{ 
-      a <- approx(c(15,25), c(a_low_15, a_low_25), temperature)$y
-      b <- approx(c(15,25), c(b_low_15, b_low_25), temperature)$y
-    }
-  }else if (food == "high"){
-    if(temperature <= 15){
-      a <- a_high_15
-      b <- b_high_15
-    }else if(temperature >= 25){  
-      a <- a_high_25
-      b <- b_high_25
-    }else{ 
-      a <- approx(c(15,25), c(a_high_15, a_high_25), temperature)$y
-      b <- approx(c(15,25), c(b_high_15, b_high_25), temperature)$y
-    }
-  }else{
-    stop('food must be either "low" or "high" ')
-  }
-  return(a + b * log(age))
-}
-
-
-# Filtering rate of Daphnia magna is calculated based on Burns et al. 1969 or Preuss.
-# Input: length [mm],Temperature [oC]/ Output: filtration rate[mL/h]
-Filtration_rate_estimation <<- function(length, temperature = 22, method = "Preuss"){
-  if(method == "Burns"){
-    F_rate_15 <- 0.153 * length^2.16
-    F_rate_20 <- 0.208 * length^2.80
-    F_rate_25 <- 0.202 * length^2.38
-    
-    if(temperature <= 15){
-      F_rate <- F_rate_15
-    }else if(temperature >= 25){  
-      F_rate <- F_rate_25
-    }else{ 
-      F_rate <- approx(c(15,20,25), c(F_rate_15, F_rate_20, F_rate_25), temperature)$y
-    }
-  }else if(method == "Preuss"){
-    F_rate <- 0.5*length^2.45
-  }else{
-    stop("Please select a valid estimation method; either 'Burns' or 'Preuss' ")
-  }
-  return(F_rate)
-}
-
-
-# Dumont et al. (1975)
-# Input: length [mm]/ Output: dry weight[mg]
-dry_weight_estimation <<- function(L){
-  
-  w1 = (1.89e-06*(L*1000)^2.25)/1000 #Donka Lake
-  w2 = (4.88e-05*(L*1000)^1.80)/1000 #River Sambre
-  # Selected w1 after validation with Martin-Creuzburg et al. (2018
-  return(w1)
-}
-
-
+#etwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/Zebrafish/Wang2023")
+setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/Zebrafish/Wang2023")
 
 
 # *** metrics ***
@@ -180,25 +97,14 @@ ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
     
     # Units explanation:
-    # C_daphnia: mol PFAS/L daphnia
+    # Zebrafish: mol PFAS/L zebrafish
     # ke: 1/h
     # Cw: mol/L
-
-    age <- init_age + time
-    #size in mm
-    size <- Size_estimation(age, temperature = 23, food="high")
     
-    
-    # dry weight mg
-    DW <- dry_weight_estimation(size)
-    # Convert DW to WW
-    WW <- 15.5 * DW  # Conversion rate 11-20 from DW to WW (Garner et al., 2018)
-    # Another post discussing DW to WW can be accessed through:
-    #https://www.madsci.org/posts/archives/2005-09/1127049424.Zo.r.html
     
     # Water concentration in ng/L
     dCw <- 0
-    # D.magna concentration in lumenconcentration in ng/g
+    # Zebrafish concentration in lumenconcentration in ng/g
     ku <- 10^ku
     ke <- 10^ke
     kon <- 10^kon
@@ -210,15 +116,15 @@ ode_func <- function(time, inits, params){
     # multiply by 1e-9 to make it grams and divide by MW. We do this directly to kon 
     # and koff to make the concentration mol/L so that we can match the literature 
     # values of kon and koff with ours
-    C_daphnia_unbound_unmol <- C_daphnia_unbound*MW/(1000*1e-09)
-    C_daphnia_bound_unmol <- C_daphnia_bound*MW/(1000*1e-09)
-    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/WW  - kon*C_prot_un*C_daphnia_unbound +   koff*C_daphnia_bound - ke*C_daphnia_unbound
-    dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
-    dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
-    C_tot <- C_daphnia_unbound_unmol + C_daphnia_bound_unmol
-    return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
-                  "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un), 
-                "WW" = WW, "C_tot" = C_tot))
+    C_zebrafish_unbound_unmol <- C_zebrafish_unbound*MW/(1000*1e-09)
+    C_zebrafish_bound_unmol <- C_zebrafish_bound*MW/(1000*1e-09)
+    dC_zebrafish_unbound <-  ku*(Cw*1e-09/MW)  - kon*C_prot_un*C_zebrafish_unbound +   koff*C_zebrafish_bound - ke*C_zebrafish_unbound
+    dC_zebrafish_bound <- kon*C_prot_un*C_zebrafish_unbound - koff*C_zebrafish_bound
+    dC_prot_un <-   koff*C_zebrafish_bound -  kon*C_prot_un*C_zebrafish_unbound
+    C_tot <- C_zebrafish_unbound_unmol + C_zebrafish_bound_unmol
+    return(list(c("dCw" = dCw,   "dC_zebrafish_unbound" = dC_zebrafish_unbound,
+                  "dC_zebrafish_bound" = dC_zebrafish_bound, "dC_prot_un" = dC_prot_un), 
+             "C_tot" = C_tot))
   })
 }
 
@@ -229,7 +135,7 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
   # Indexes of body burden and exposure time in data frame
   BB_index <- c(2,4,6)
   ExpTime_index <- c(1,3,5)
-  # Age of D.magna at beginning of exposure
+  # Age of zebrafish at beginning of exposure
   init_age <- age
   # Create a counter to mark the position of fitted parameters of x
   # that corresponds to a specific combination of PFAS and temperature
@@ -254,12 +160,12 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
     # Body burden of selected PFAS at selected temperature
     BodyBurden <- df[!is.na(df[,BB_index[temp_iter]]),BB_index[temp_iter]]
     # Time used by numerical solver that integrates the system of ODE
-    sol_times <- seq(0,15, 0.1 )
+    sol_times <- seq(0,29, 0.1 )
     # Fitted parameters
     
     
-    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
-                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
+    inits <- c( "Cw" = C_water,  "C_zebrafish_unbound" = 0,
+                "C_zebrafish_bound" = 0, "C_prot_un" = C_prot_init)
     
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
                 "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
@@ -294,8 +200,9 @@ obj_func <- function(x, PFAS_data, PFAS_name, Cwater, age, temperatures, MW, met
 
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/ku/logspace/protein/molar")
-  
+  #setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/Zebrafish/Wang2023/Results")
+  setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/Zebrafish/Wang2023/results")
+        
   # Age of D.magna at beginning of exposure
   init_age <- age
   # Create a counter to mark the position of fitted parameters of x
@@ -306,7 +213,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
   # Load parameters
   parameters <- params
   # Time used by numerical solver that integrates the system of ODE
-  sol_times <- seq(0,15, 0.1 )
+  sol_times <- seq(0,29, 0.1 )
   # Data frame to store predictions for each temperature
   predictions <- data.frame("time" = sol_times, "BB_16" = rep(NA, length(sol_times)),
                             "BB_20" = rep(NA, length(sol_times)), "BB_24" = rep(NA, length(sol_times)))
@@ -323,8 +230,8 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
     Temp <- temperatures[temp_iter]
     # Fitted parameters
     
-    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
-                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
+    inits <- c( "Cw" = C_water,  "C_zebrafish_unbound" = 0,
+                "C_zebrafish_bound" = 0, "C_prot_un" = C_prot_init)
     
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
                 "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
@@ -340,11 +247,11 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
     geom_line(data = predictions, aes(x=time, y=BB_16,  colour = "16oC"), size=1.7)+
     geom_line(data = predictions, aes(x=time, y=BB_20, colour = "20oC"), size=1.7)+
     geom_line(data = predictions, aes(x=time, y=BB_24, colour = "24oC"), size=1.7)+
-    geom_point(data = df, aes(x=time_16  , y=BB_16 ,  colour = "16oC"), size=5)+
-    geom_point(data = df, aes(x=time_20, y=BB_20,  colour = "20oC"), size=5)+
-    geom_point(data = df, aes(x=time_24, y=BB_24,  colour = "24oC"), size=5)+
+    geom_point(data = df, aes(x=TIME16  , y=BB16 ,  colour = "16oC"), size=5)+
+    geom_point(data = df, aes(x=TIME20, y=BB20,  colour = "20oC"), size=5)+
+    geom_point(data = df, aes(x=TIME24, y=BB24,  colour = "24oC"), size=5)+
     
-    labs(title = paste(PFAS_name,"body burden in D.magna", sep = " "),
+    labs(title = paste(PFAS_name,"body burden in zebrafish", sep = " "),
          y = "Body burden (ng/g WW)", x = "Time (days)")+
     scale_colour_manual("Temperature", 
                         breaks = c("16oC", "20oC", "24oC"),
@@ -361,7 +268,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
           legend.title = element_text(size=14),
           legend.text = element_text(size=14),
           axis.text = element_text(size = 14))
-  ggsave(paste0(PFAS_name,".png"))
+  ggsave(paste0(PFAS_name,".png"), width=15, height=10)
 }
 
 ##############################################################################
@@ -370,14 +277,17 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
 
 sheet_names <- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA", 
                  "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
-PFAS_names <- sheet_names
-Molecular_weights <- c(214, 570, 330, 300, 514, 614, 364, 314,464, 414, 500,  364, 564)
+PFAS_names <- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA", 
+                "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
+Molecular_weights <- list("PFBA" = 214, "F-53B" = 570, "GenX" = 330, "PFBS" = 300, "PFDA" = 514, 
+                          "PFDoA" = 614, "PFHpA" = 364, "PFHxA" = 314,"PFNA" = 464, "PFOA" = 414,  "PFOS" = 500,  
+                          "PFPeA" = 364, "PFUnA" = 564)
 data_ls <- list()
 data_plot <- list()
 
 for(sheet_name in sheet_names){
-  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
-  data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_Data.xlsx', sheet = sheet_name)
+  data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_Data.xlsx', sheet = sheet_name)
 }
 
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX",#"NLOPT_LN_SBPLX", #"NLOPT_LN_NEWUOA", #"NLOPT_LN_SBPLX" , #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
@@ -405,16 +315,16 @@ solutions <- list()
 # List to store optimization results
 optimizations <- list()
 for (i in 1:length(PFAS_names)){
-  MW <- Molecular_weights[i]
+  MW <- Molecular_weights[[PFAS_names[i]]]
   # Define initial values of fitted parameters to provide to the optimization routine
   # For each PFAS and temperature combination we have two parameters
-  #x0 <- c(8, 5, 5, 7, 1e-05)
-  x0 <- c(7, 6, 6, 8, 1e-05)# For PFBS
+  x0 <- c(8, 5, 5, 7, 1e-04)
+  #x0 <- c(7, 6, 6, 8, 5e-05)# For PFBS
   set.seed(12312)
   optimization<- nloptr::nloptr(x0 = x0,
                                 eval_f = obj_func,
-                                lb	=  c(5,-1,1,5, 1e-07),
-                                ub =   c(12,10, 9, 12,  1e-03),
+                              lb	=  c(-5,-5,-5,-5, 1e-08),
+                               ub =   c(15, 15, 15, 15,  1e-03),
                                 opts = opts,
                                 PFAS_data = data_ls,
                                 PFAS_name = PFAS_names[i],
@@ -422,12 +332,12 @@ for (i in 1:length(PFAS_names)){
                                 age = age ,
                                 temperatures = temperatures,
                                 MW = MW,
-                                metric = "rmse")
+                                metric = "PBKOF")
   optimizations[[PFAS_names[i]]] <- optimization
   parameters[[PFAS_names[i]]] <- optimization$solution
   names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","Ka", "ke", "C_prot_init")
   
-  sol_times <- seq(0,15, 0.01 )
+  sol_times <- seq(0,29, 0.01 )
   # Iterate over number of distinct temperature used in the experiment
   temp_iter <- 2
   # Initial water concentration of PFAS at selected temperature
@@ -441,8 +351,8 @@ for (i in 1:length(PFAS_names)){
   ke <- parameters[[PFAS_names[i]]][4]
   C_prot_init <- unname(parameters[[PFAS_names[i]]][5])
   
-  inits <- c( "Cw" = C_water, "C_daphnia_unbound" = 0,
-              "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
+  inits <- c( "Cw" = C_water,  "C_zebrafish_unbound" = 0,
+                              "C_zebrafish_bound" = 0, "C_prot_un" = C_prot_init)
   params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
               "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
   solutions[[PFAS_names[i]]] <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
