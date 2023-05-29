@@ -161,8 +161,8 @@ create.events <- function(parameters){
     if (ltimes != lcon){
       stop("The times of measurement should be equal in number to the concentrations")
     }else{
-        events <- list(data = rbind(data.frame(var = c("Cw"),  time = Cwater_time, 
-                                               value = c(Cwater), method = c("rep")) ))
+      events <- list(data = rbind(data.frame(var = c("Cw"),  time = Cwater_time, 
+                                             value = c(Cwater), method = c("rep")) ))
     }
     return(events)
   })
@@ -173,46 +173,46 @@ create.events <- function(parameters){
 #4. Custom function 
 #==================
 custom.func <- function(age, temperature, food){
-
+  
   # Estimation of length of D. magna based on age (from Betini et al. (2019))
-    # T = 15 o C
-    a_low_15 <-0.354
-    b_low_15 <- 0.527
-    a_high_15 <- 0.105
-    b_high_15 <- 0.953
-    
-    # T = 25 o C
-    a_low_25 <- 0.811
-    b_low_25 <- 0.355
-    a_high_25 <- 0.698
-    b_high_25 <- 0.83
-    
-    if(food == "low"){
-      if(temperature <= 15){
-        a <- a_low_15
-        b <- b_low_15
-      }else if(temperature >= 25){  
-        a <- a_low_25
-        b <- b_low_25
-      }else{ 
-        a <- approx(c(15,25), c(a_low_15, a_low_25), temperature)$y
-        b <- approx(c(15,25), c(b_low_15, b_low_25), temperature)$y
-      }
-    }else if (food == "high"){
-      if(temperature <= 15){
-        a <- a_high_15
-        b <- b_high_15
-      }else if(temperature >= 25){  
-        a <- a_high_25
-        b <- b_high_25
-      }else{ 
-        a <- approx(c(15,25), c(a_high_15, a_high_25), temperature)$y
-        b <- approx(c(15,25), c(b_high_15, b_high_25), temperature)$y
-      }
+  # T = 15 o C
+  a_low_15 <-0.354
+  b_low_15 <- 0.527
+  a_high_15 <- 0.105
+  b_high_15 <- 0.953
+  
+  # T = 25 o C
+  a_low_25 <- 0.811
+  b_low_25 <- 0.355
+  a_high_25 <- 0.698
+  b_high_25 <- 0.83
+  
+  if(food == "low"){
+    if(temperature <= 15){
+      a <- a_low_15
+      b <- b_low_15
+    }else if(temperature >= 25){  
+      a <- a_low_25
+      b <- b_low_25
+    }else{ 
+      a <- approx(c(15,25), c(a_low_15, a_low_25), temperature)$y
+      b <- approx(c(15,25), c(b_low_15, b_low_25), temperature)$y
     }
-    size = a + b * log(age) #mm
-    w = (1.89e-06*(size*1000)^2.25)/1000 #mg DW
-    
+  }else if (food == "high"){
+    if(temperature <= 15){
+      a <- a_high_15
+      b <- b_high_15
+    }else if(temperature >= 25){  
+      a <- a_high_25
+      b <- b_high_25
+    }else{ 
+      a <- approx(c(15,25), c(a_high_15, a_high_25), temperature)$y
+      b <- approx(c(15,25), c(b_high_15, b_high_25), temperature)$y
+    }
+  }
+  size = a + b * log(age) #mm
+  w = (1.89e-06*(size*1000)^2.25)/1000 #mg DW
+  
   return(list(size = size, DW = w))
 }
 
@@ -232,7 +232,7 @@ ode.func <- function(time, inits, params, custom.func){
     
     age <- init_age + time #in days
     from_func <- custom.func(age, temperature, food)
-
+    
     #size in mm
     size <- from_func$size
     
@@ -248,7 +248,7 @@ ode.func <- function(time, inits, params, custom.func){
     kon <- 10^kon
     Ka <- 10^Ka
     koff <- kon/Ka
-   
+    
     C_daphnia_unbound_unmol <- C_daphnia_unbound*MW/(1000*1e-09)
     C_daphnia_bound_unmol <- C_daphnia_bound*MW/(1000*1e-09)
     # The concentration of the water is defined through the user input
@@ -265,43 +265,76 @@ ode.func <- function(time, inits, params, custom.func){
 }
 
 #=============
-#6. User input 
+#6.  input 
 #=============
+
+#Values from Ding et al.2012
+EC50_24_mol <- c("PFBA" = 0.865,"PFOA" = 0.531, "PFNA" = 0.481,  "PFDA" = 0.339,"PFUnA" = 0.238,
+                 "PFDoA" = 0.162  )#mM
+EC50_48_mol <- c("PFBA" = 0.848,"PFOA" = 0.511, "PFNA" = 0.326,  "PFDA" = 0.318,"PFUnA" = 0.236,
+                 "PFDoA" = 0.129 )#mM
+
+EC50_24 <- rep(NA, length(EC50_24_mol))
+names(EC50_24) <- names(EC50_24_mol)
+EC50_48 <-  rep(NA, length(EC50_48_mol))
+names(EC50_48) <- names(EC50_48_mol)
+
+
+Molecular_weights <- list("PFBA" = 214,  "PFDA" = 514, "PFDoA" = 614, "PFNA" = 464, "PFOA" = 414, "PFUnA" = 564)
+for(PFAS in names(EC50_24_mol)){
+  EC50_24[[PFAS]] <- (EC50_24_mol[[PFAS]]/1000)*Molecular_weights[[PFAS]]*1000 #mg/L
+  EC50_48[[PFAS]] <- (EC50_48_mol[[PFAS]]/1000)*Molecular_weights[[PFAS]]*1000 #mg/L
+  
+}
+
 # Parameters used as user input
 init_age <- 1 #days
-temperature <- 22 #oC
+temperature <- 20 #oC
 food <- "L" # values: H/L
-Cwater <- c(10,5,100) #mg/L
-Cwater_time <- c(0,5,10)
-PFAS <- "PFUnA"#values:"PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA", 
-         #"PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA"
-
-user_input <- list( "init_age" = init_age,
-                    "temperature" = temperature, 
-                    "food" = food,
-                    "Cwater"=Cwater, "PFAS" = PFAS, "Cwater_time" = Cwater_time)
+sample_time <- seq(0,2,0.01)  #hours
 
 
-params <- create.params(user_input)
-inits <- create.inits(params)
-events <- create.events(params)
-sample_time <- seq(0,30,1)  #hours
+EC50_24_internal <- rep(NA, length(EC50_24))
+names(EC50_24_internal) <- names(EC50_24)
 
-solution <-  ode(times = sample_time,  func = ode.func, y = inits, parms = params,
-                 events = events, custom.func = custom.func, method="bdf",rtol = 1e-05, atol = 1e-05)
-print(tail(solution))
+EC50_48_internal <-  rep(NA, length(EC50_48))
+names(EC50_48_internal) <- names(EC50_48)
 
-#====================
-#7. Upload on Jaqpot 
-#===================
-# Subset of features to be displayed on the user interface
-predicted.feats <- c("Cw" ,   "C_unbound", "C_bound", "WW" , "C_tot" )
+for(PFAS in names(EC50_24_mol)){
+  # EC50_24
+  Cwater <- EC50_24[[PFAS]]
+  Cwater_time <- 0
+  user_input <- list( "init_age" = init_age,
+                      "temperature" = temperature, 
+                      "food" = food,
+                      "Cwater"=Cwater, "PFAS" = PFAS, "Cwater_time" = Cwater_time)
+  
+  params <- create.params(user_input)
+  inits <- create.inits(params)
+  events <- create.events(params)
 
-# Log in Jaqpot server
-jaqpotr::login.cred()
+  solution <-  ode(times = sample_time,  func = ode.func, y = inits, parms = params,
+                   events = events, custom.func = custom.func, method="bdf",rtol = 1e-05, atol = 1e-05)
 
-# Deploy the model on the Jaqpot server to create a web service
-jaqpotr::deploy.pbpk(user.input = user_input,out.vars = predicted.feats,
-                     create.params = create.params,  create.inits = create.inits,
-                     create.events = create.events, custom.func = custom.func,
-                     method = "bdf",url = "https://api.jaqpot.org/jaqpot/")
+  EC50_24_internal[[PFAS]] <- solution[solution[,"time"]==1, "C_tot"]
+    
+  # EC50_48
+  Cwater <- EC50_48[[PFAS]]
+  Cwater_time <- 0
+  user_input <- list( "init_age" = init_age,
+                      "temperature" = temperature, 
+                      "food" = food,
+                      "Cwater"=Cwater, "PFAS" = PFAS, "Cwater_time" = Cwater_time)
+  
+  params <- create.params(user_input)
+  inits <- create.inits(params)
+  events <- create.events(params)
+  
+  solution <-  ode(times = sample_time,  func = ode.func, y = inits, parms = params,
+                   events = events, custom.func = custom.func, method="bdf",rtol = 1e-05, atol = 1e-05)
+  EC50_48_internal[[PFAS]] <- solution[solution[,"time"]==2, "C_tot"]
+  
+}
+
+
+
