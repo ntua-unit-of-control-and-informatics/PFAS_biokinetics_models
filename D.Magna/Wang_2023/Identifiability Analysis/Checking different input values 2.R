@@ -1,8 +1,8 @@
 library(parallel)
 library(deSolve)
 library(nloptr)
-setwd("C:/Users/vassi/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
-
+#setwd("C:/Users/vassi/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
+setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 
 rmse <- function(observed, predicted){
   sqrt(mean((observed-predicted)^2))
@@ -237,15 +237,17 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-5, atol = 1e-5))
+                                        rtol = 1e-6, atol = 1e-6))
 
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
+      score[temp_iter] <- rmse(BodyBurden, results)
     }else{
-      stop(print("Length of predictions is not equal to the length of data"))
-    }
+     # stop(print("Length of predictions is not equal to the length of data"))
+      score[temp_iter]=50000 
+      }
 
-    score[temp_iter] <- rmse(BodyBurden, results)
+    #score[temp_iter] <- rmse(BodyBurden, results)
   }
 
   # Take the average score of all PFAS and temperatures
@@ -298,7 +300,7 @@ wrapper_opt <- function(X){
                 "ftol_rel" = 0,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
-                "maxeval" = 50,
+                "maxeval" = 1000,
                 "print_level" = 1)
 
   opt_params_per_substance <- list()
@@ -307,8 +309,8 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-12,-12),
-                                   ub =   c(8,8),
+                                   lb	=  c(-1,-12),
+                                   ub =   c(-15,-15),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,

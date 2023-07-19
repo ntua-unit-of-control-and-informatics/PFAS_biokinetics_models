@@ -1,7 +1,9 @@
 library(parallel)
 library(deSolve)
 library(nloptr)
-setwd('C:/Users/user/Documents/GitHub/Identifiability/Daphnia_magna_example/old codes')
+
+#setwd('C:/Users/user/Documents/GitHub/Identifiability/Daphnia_magna_example/old codes')
+setwd('/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023')
 
 #=====================================#
 #  Weighted Sum of Squared Residuals  #
@@ -169,64 +171,8 @@ ode_func <- function(time, inits, params){
   })
 }
 
-#=====================================#
-#  Weighted Sum of Squared Residuals  #
-#=====================================#
 
-WSSR <- function(observed, predicted, weights, comp.names =NULL){
-  # Check if the user provided the correct input format
-  if (!is.list(observed) || !is.list(predicted) || !is.list(weights)){
-    stop(" The observations, predictions and weights must be lists")
-  }
-  # Check if the user provided equal length lists
-  if (length(observed) != length(predicted) || length(observed) != length(weights)){
-    stop(" The observations, predictions and weights must have the same compartments")
-  }
-  
-  # Define the number of observed outputs
-  N_outputs <- length(predicted)
-  # Define the number of observations per output
-  N_obs <- rep(NA, N_outputs)
-  
-  # A vector to store the values of the weighted squared sum residuals of each compartment
-  outputs_res <- c()
-  for (i in 1:N_outputs) { # loop over the observed outputs
-    N_obs[i] <- length(observed[[i]])
-    
-    # Check that all observed, predicted and weights vectors have the same length
-    if(N_obs[i] != length(predicted[[i]]) || N_obs[i] != length(weights[[i]])){
-      stop(paste0("Compartment ",i," had different length in the observations and predictions"))
-    }
-    # The number of observations for output i
-    N <- N_obs[i]
-    
-    # Initiate a variable to estimate the sum of squared residuals for output j
-    sq_weighted_res_j <- 0
-    for (j in 1:N) { #loop over the experimental points i compartment i
-      sq_weighted_res_j <- sq_weighted_res_j + ((observed[[i]][j] - predicted[[i]][j]) / weights[[i]][j])^2   
-    }
-    outputs_res[i] <- sq_weighted_res_j
-  }
-  
-  WSSR_results <- sum(outputs_res)
-  
-  # Name the list of compartment discrepancy indices
-  if ( !is.null(comp.names)){
-    names(WSSR_results) <- comp.names
-  }else if (!is.null(names(observed))){
-    names(WSSR_results) <- names(observed)
-  } else if (!is.null(names(predicted)) && is.null(comp.names) ){
-    names(WSSR_results) <- names(predicted)
-  } else if (!is.null(names(weights)) && is.null(comp.names) ){
-    names(WSSR_results) <- names(weights)
-  }
-  
-  return(WSSR_results)
-}
 
-# The updated objective function is a slightly changed version of the general objective function
-# in order to be used inside the profile likelihood function and be able to change 
-# the constant parameter easily
 obj_f <- function(x, params_names, constant_theta, constant_theta_name, 
                   constant_params=NULL,data_df, errors_df){
   
@@ -315,9 +261,9 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_name,
 
 ################################################################################
 # Load the experimental data
-data_ls <- openxlsx::read.xlsx ('C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Wang_data_reduced2.xlsx', sheet = 'PFDoA')
-data_plot <- openxlsx::read.xlsx ('C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Wang_data.xlsx', sheet = 'PFDoA')
-errors <- read.csv('C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/PFDoA_errors.csv')
+data_ls <- openxlsx::read.xlsx ('/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Wang_data_reduced2.xlsx', sheet = 'PFDoA')
+data_plot <- openxlsx::read.xlsx ('/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Wang_data_reduced2.xlsx', sheet = 'PFDoA')
+errors <- read.csv('/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/PFDoA_errors.csv')
 
 # In this section, various values will be employed for the parameters Ku, 
 # C_init_prot, and kon. Following each parameter combination, the remaining
@@ -326,9 +272,9 @@ errors <- read.csv('C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Mag
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(0.001, 1, 1000))
-C_init_prot_values <- log10(c(1e-10, 1e-08, 1e-6))
-kon_values = log10(c(0.001, 1, 1000)) 
+ku_values <- log10(c(0.001, 1, 1000, 10000000))
+C_init_prot_values <- log10(c(1e-10, 1e-08, 1e-06, 1e-04))
+kon_values = log10(c(0.001, 1, 1000, 10000000)) 
 
 # Create a list to save all the possible triplets of parameters
 fixed_params <- list()
@@ -351,7 +297,7 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke 
-  x0 <- c(0,0)
+  x0 <- c(-1,-1)
   params_names <- c("Ka", "ke")
   constant_theta = X
   constant_theta_name =  c("ku", "kon", "C_prot_init")
@@ -362,13 +308,13 @@ wrapper_opt <- function(X){
                 "ftol_rel" = 0,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
-                "maxeval" = 2000,
-                "print_level" = 1)
+                "maxeval" = 3000,
+                "print_level" = 0)
   
   start_time <- Sys.time()
   optimization <- nloptr::nloptr(x0 = x0,
                                  eval_f = obj_f,
-                                 lb	=  c(-12,-12),
+                                 lb	=  c(-11,-11),
                                  ub =   c(8,8), 
                                  constant_theta = constant_theta,
                                  constant_theta_name = constant_theta_name,
@@ -378,7 +324,7 @@ wrapper_opt <- function(X){
                                  errors_df = errors,
                                  opts = opts)
   
-  return(optimization)
+  return(list('fixed_params'= X, 'optimization' = optimization))
 }
 
 
@@ -392,3 +338,4 @@ output <- parLapply(cluster, fixed_params, wrapper_opt)
 # Terminate the cluster.
 stopCluster(cluster)
 total.duration <- Sys.time() - start.time
+
