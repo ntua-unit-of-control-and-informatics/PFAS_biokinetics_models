@@ -19,7 +19,7 @@ create.params  <- function(user_input){
       stop(" The model supports only temperatures between 15 and 25 degrees Celsius")
     }
     
-    # Convert water concentration from mg/L to ng/L
+    # Convert water concentration from ug/L to ng/L
     Cwater <- Cwater*1000
     
     if(food == "H"){

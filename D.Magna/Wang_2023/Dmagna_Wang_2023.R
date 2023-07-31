@@ -396,7 +396,7 @@ Cwater = matrix(c(1.44, 4.05, 9.56, 19.40, 18.5, 22.7, 22.5, 22.9, 22.6, 23.2,22
                   2.31, 5.3, 12.1, 21.5, 21.9, 25.0, 25.2, 25.8, 26.9, 25.7, 24.6, 21.9, 24.8), ncol = 3)
 colnames(Cwater) <-  c("16oC", "20oC", "24oC")
 rownames(Cwater) <- PFAS_names
-# Convert water concentration in ng/L
+# Convert water concentration to ng/L
 Cwater = Cwater*1000
 age = 7+7 # age of D.magna at the beginning of exposure in days
 temperatures <- c(16, 20, 24) #experiment temperature in oC 

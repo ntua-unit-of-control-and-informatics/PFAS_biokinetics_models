@@ -19,7 +19,7 @@ create.params  <- function(user_input){
       stop(" The model supports only temperatures between 15 and 25 degrees Celsius")
     }
     
-    # Convert water concentration from mg/L to ng/L
+    # Convert water concentration from ug/L to ng/L
     Cwater <- Cwater*1000
     
     if(food == "H"){
@@ -226,6 +226,9 @@ ode.func <- function(time, inits, params, custom.func){
     # ke: 1/day
     # ku: Lwater/day
     # Cw: ng PFAS/L water
+    # kon:L/mol/s and then we convert it to L/mol/d
+    # koff: 1/s and then we convert it to 1/d
+    # ka: L/mol
     # C_daphnia_unbound/C_daphnia_bound: mol PFAS/L D.magna
     # C_daphnia_unbound_unmol/C_daphnia_bound_unmol: ng PFAS/g D.magna
     # C_prot_un: mol prot/L
@@ -245,15 +248,18 @@ ode.func <- function(time, inits, params, custom.func){
     
     ku <- 10^ku
     ke <- 10^ke
-    kon <- 10^kon
-    Ka <- 10^Ka
+    kon <- (10^kon)*60*60*24 #convert to mol/l/d
+    Ka <- 10^Ka 
     koff <- kon/Ka
     
-    C_daphnia_unbound_unmol <- C_daphnia_unbound*MW/(1000*1e-09)
-    C_daphnia_bound_unmol <- C_daphnia_bound*MW/(1000*1e-09)
+    # Multiply MW by 1e09 to convert g/mol to ng/mol and then 
+    # divide by the density of water to make L to g wet weight
+    C_daphnia_unbound_unmol <- C_daphnia_unbound*(MW*1e9)/1000
+    C_daphnia_bound_unmol <- C_daphnia_bound*(MW*1e9)/1000
     # The concentration of the water is defined through the user input
     dCw <- 0
-    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/WW  - kon*C_prot_un*C_daphnia_unbound +   koff*C_daphnia_bound - ke*C_daphnia_unbound
+    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/WW  - kon*C_prot_un*C_daphnia_unbound +
+                             koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
     dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
     C_tot <- C_daphnia_unbound_unmol + C_daphnia_bound_unmol
@@ -282,8 +288,8 @@ names(EC50_48) <- names(EC50_48_mol)
 
 Molecular_weights <- list("PFBA" = 214,  "PFDA" = 514, "PFDoA" = 614, "PFNA" = 464, "PFOA" = 414, "PFUnA" = 564)
 for(PFAS in names(EC50_24_mol)){
-  EC50_24[[PFAS]] <- (EC50_24_mol[[PFAS]]/1000)*Molecular_weights[[PFAS]]*1000 #mg/L
-  EC50_48[[PFAS]] <- (EC50_48_mol[[PFAS]]/1000)*Molecular_weights[[PFAS]]*1000 #mg/L
+  EC50_24[[PFAS]] <- EC50_24_mol[[PFAS]]*Molecular_weights[[PFAS]]*1e03 #ug/L
+  EC50_48[[PFAS]] <- EC50_48_mol[[PFAS]]*Molecular_weights[[PFAS]]*1e03 #ug/L
   
 }
 
@@ -316,7 +322,7 @@ for(PFAS in names(EC50_24_mol)){
   solution <-  ode(times = sample_time,  func = ode.func, y = inits, parms = params,
                    events = events, custom.func = custom.func, method="bdf",rtol = 1e-05, atol = 1e-05)
 
-  EC50_24_internal[[PFAS]] <- solution[solution[,"time"]==1, "C_tot"]
+  EC50_24_internal[[PFAS]] <- mean(solution[, "C_tot"])
     
   # EC50_48
   Cwater <- EC50_48[[PFAS]]
@@ -332,7 +338,7 @@ for(PFAS in names(EC50_24_mol)){
   
   solution <-  ode(times = sample_time,  func = ode.func, y = inits, parms = params,
                    events = events, custom.func = custom.func, method="bdf",rtol = 1e-05, atol = 1e-05)
-  EC50_48_internal[[PFAS]] <- solution[solution[,"time"]==2, "C_tot"]
+  EC50_48_internal[[PFAS]] <- mean(solution[, "C_tot"])
   
 }
 
