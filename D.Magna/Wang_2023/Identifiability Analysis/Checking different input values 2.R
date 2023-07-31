@@ -150,24 +150,32 @@ ode_func <- function(time, inits, params){
 
     # Water concentration in ng/L
     dCw <- 0
-    # D.magna concentration in lumenconcentration in ng/g
+    
     ku <- 10^ku
     ke <- 10^ke
-    kon <- 10^kon
-    Ka <- 10^Ka
+    kon <- (10^kon)*60*60*24 #convert to mol/l/d
+    Ka <- 10^Ka 
     koff <- kon/Ka
+    
     # Reported values for Kon and koff range between 1e2-1e04 and 1e-3-1e-1 in L/mol/s
     # and s-^-1 respectively. Our concentrations are in ng/g. Assuming density = 1000g/L
     # then the concentration in ng/g is multyplied by 1000 to make it ng/L and then by
     # multiply by 1e-9 to make it grams and divide by MW. We do this directly to kon
     # and koff to make the concentration mol/L so that we can match the literature
     # values of kon and koff with ours
-    C_daphnia_unbound_unmol <- C_daphnia_unbound*MW/(1000*1e-09)
-    C_daphnia_bound_unmol <- C_daphnia_bound*MW/(1000*1e-09)
-    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/WW  - kon*C_prot_un*C_daphnia_unbound +   koff*C_daphnia_bound - ke*C_daphnia_unbound
+    
+    
+    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/(WW/1000)  - kon*C_prot_un*C_daphnia_unbound +
+                           koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
     dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
+    
+    # Multiply MW by 1e09 to convert g/mol to ng/mol and then 
+    # divide by the density of water to make L to g wet weight
+    C_daphnia_unbound_unmol <- C_daphnia_unbound*(MW*1e9)/1000
+    C_daphnia_bound_unmol <- C_daphnia_bound*(MW*1e9)/1000
     C_tot <- C_daphnia_unbound_unmol + C_daphnia_bound_unmol
+    
     return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
                   "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un),
                 "WW" = WW, "C_tot" = C_tot))
@@ -288,7 +296,7 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(0,0)
+  x0 <- c(4,0)
   params_names <- c("Ka", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "kon", "C_prot_init")
@@ -309,8 +317,8 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-1,-12),
-                                   ub =   c(-15,-15),
+                                   lb	=  c(2,-5),
+                                   ub =   c(7,5),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -344,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(0.001, 1, 1000))
-C_prot_init_values <- log10(c(1e-10, 1e-08, 1e-6))
-kon_values = log10(c(0.001, 1, 1000))
+ku_values <- log10(c(0.01, 10, 1000))
+C_prot_init_values <- log10(c(1e-8, 1e-07, 1e-6))
+kon_values = log10(c(1e3, 1e6, 1e8))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance

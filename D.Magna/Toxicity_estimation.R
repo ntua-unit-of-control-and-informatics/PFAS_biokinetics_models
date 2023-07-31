@@ -258,7 +258,7 @@ ode.func <- function(time, inits, params, custom.func){
     C_daphnia_bound_unmol <- C_daphnia_bound*(MW*1e9)/1000
     # The concentration of the water is defined through the user input
     dCw <- 0
-    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/WW  - kon*C_prot_un*C_daphnia_unbound +
+    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/(WW/1000)  - kon*C_prot_un*C_daphnia_unbound +
                              koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
     dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
