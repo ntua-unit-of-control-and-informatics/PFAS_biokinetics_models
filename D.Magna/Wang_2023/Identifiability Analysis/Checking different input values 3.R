@@ -1,7 +1,7 @@
 library(parallel)
 library(deSolve)
 library(nloptr)
-#setwd("C:/Users/vassi/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
+#setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 
 rmse <- function(observed, predicted){
@@ -296,10 +296,10 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(6,1)
-  params_names <- c("Kon", "ke")
+  x0 <- c(6,-1)
+  params_names <- c("kon", "ke")
   constant_theta = X
-  constant_theta_names =  c("ku", "ka", "C_prot_init")
+  constant_theta_names =  c("ku", "Ka", "C_prot_init")
   constant_params <- NULL
 
   # the selected settings for the optimizer
@@ -317,8 +317,8 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-12,-12),
-                                   ub =   c(8,8),
+                                   lb	=  c(0,-6),
+                                   ub =   c(9,4),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -352,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(0.005))
-C_prot_init_values <- log10(c(5e-5))
-kon_values = log10(c(1e5, 5e5, 1e6))
+ku_values <- log10(c(1e-4, 1e-3, 1e-2))
+C_prot_init_values <- log10(c(1e-5, 1e-6, 1e-7))
+ka_values = log10(c(1e3, 1e4, 1e5))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
@@ -362,8 +362,8 @@ kon_values = log10(c(1e5, 5e5, 1e6))
 fixed_params <- list()
 for (i in 1:length(ku_values)) {
   for (j in 1:length(C_prot_init_values)) {
-    for (k in 1:length(kon_values)) {
-      triplet <- c(ku = ku_values[i], kon = kon_values[k], C_prot_init = C_prot_init_values[j])
+    for (k in 1:length(ka_values)) {
+      triplet <- c(ku = ku_values[i], Ka = ka_values[k], C_prot_init = C_prot_init_values[j])
       fixed_params[[length(fixed_params) + 1]] <- triplet
     }
   }
