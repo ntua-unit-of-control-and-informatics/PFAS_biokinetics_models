@@ -296,7 +296,7 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(6,-1)
+  x0 <- c(7,3)
   params_names <- c("kon", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "Ka", "C_prot_init")
@@ -352,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(1e-4, 1e-3, 1e-2))
-C_prot_init_values <- log10(c(1e-5, 1e-6, 1e-7))
-ka_values = log10(c(1e3, 1e4, 1e5))
+ku_values <- log10(c(5e-4, 1e-3, 5e-3))
+C_prot_init_values <- log10(c(5e-7, 1e-6, 5e-6))
+ka_values = log10(c(1e1, 1e2, 1e3))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
