@@ -352,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(0.01, 10, 1000))
-C_prot_init_values <- log10(c(1e-8, 1e-07, 1e-6))
-kon_values = log10(c(1e3, 1e6, 1e8))
+ku_values <- log10(c(0.0001, 0.001, 0.01))
+C_prot_init_values <- log10(c(5e-7, 1e-07, 5e-6))
+kon_values = log10(c(1e7, 1e8, 1e9))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
