@@ -317,8 +317,8 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-2,-8),
-                                   ub =   c(8,6),
+                                   lb	=  c(-8,-8),
+                                   ub =   c(8,8),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
