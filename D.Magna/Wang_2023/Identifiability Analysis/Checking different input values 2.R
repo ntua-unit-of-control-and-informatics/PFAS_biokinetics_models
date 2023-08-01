@@ -304,11 +304,11 @@ wrapper_opt <- function(X){
 
   # the selected settings for the optimizer
   opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-                "xtol_rel" = 0,
-                "ftol_rel" = 0,
+                "xtol_rel" = 1e-07,
+                "ftol_rel" = 1e-07,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
-                "maxeval" = 1000,
+                "maxeval" = 2000,
                 "print_level" = 1)
 
   opt_params_per_substance <- list()
@@ -317,7 +317,7 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(2,-5),
+                                   lb	=  c(2,-7),
                                    ub =   c(7,5),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
