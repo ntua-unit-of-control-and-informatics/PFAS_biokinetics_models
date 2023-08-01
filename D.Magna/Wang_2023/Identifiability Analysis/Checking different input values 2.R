@@ -296,7 +296,7 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(4,0)
+  x0 <- c(4,3)
   params_names <- c("Ka", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "kon", "C_prot_init")
@@ -308,7 +308,7 @@ wrapper_opt <- function(X){
                 "ftol_rel" = 1e-07,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
-                "maxeval" = 2000,
+                "maxeval" = 3000,
                 "print_level" = 1)
 
   opt_params_per_substance <- list()
@@ -317,7 +317,7 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-8,-8),
+                                   lb	=  c(-10,-10),
                                    ub =   c(8,8),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
@@ -352,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(0.0005, 0.001, 0.005))
-C_prot_init_values <- log10(c(1e-6, 1e-05, 5e-5))
-kon_values = log10(c(5e6, 1e7, 5e7))
+ku_values <- log10(c(0.005, 0.01, 0.05))
+C_prot_init_values <- log10(c(5e-5, 1e-04, 4e-4))
+kon_values = log10(c(5e7, 1e6, 5e6))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
