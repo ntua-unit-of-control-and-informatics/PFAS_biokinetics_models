@@ -317,8 +317,8 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(2,-7),
-                                   ub =   c(7,5),
+                                   lb	=  c(2,-8),
+                                   ub =   c(8,6),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -352,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c(0.0001, 0.001, 0.01))
-C_prot_init_values <- log10(c(5e-7, 1e-07, 5e-6))
-kon_values = log10(c(1e7, 1e8, 1e9))
+ku_values <- log10(c(0.0005, 0.001, 0.005))
+C_prot_init_values <- log10(c(1e-6, 1e-05, 5e-5))
+kon_values = log10(c(5e6, 1e7, 5e7))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
