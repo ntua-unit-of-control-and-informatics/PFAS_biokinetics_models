@@ -296,10 +296,10 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(4,-1)
-  params_names <- c("Ka", "ke")
+  x0 <- c(6,1)
+  params_names <- c("Kon", "ke")
   constant_theta = X
-  constant_theta_names =  c("ku", "kon", "C_prot_init")
+  constant_theta_names =  c("ku", "ka", "C_prot_init")
   constant_params <- NULL
 
   # the selected settings for the optimizer
