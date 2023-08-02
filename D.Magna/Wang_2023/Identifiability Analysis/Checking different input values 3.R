@@ -296,7 +296,7 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(7,3)
+  x0 <- c(5,-3)
   params_names <- c("kon", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "Ka", "C_prot_init")
