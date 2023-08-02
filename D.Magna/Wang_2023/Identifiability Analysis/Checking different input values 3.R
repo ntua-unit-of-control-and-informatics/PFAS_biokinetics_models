@@ -304,8 +304,8 @@ wrapper_opt <- function(X){
 
   # the selected settings for the optimizer
   opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-                "xtol_rel" = 0,
-                "ftol_rel" = 0,
+                "xtol_rel" = 1e-10,
+                "ftol_rel" = 1e-10,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
                 "maxeval" = 3000,
