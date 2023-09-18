@@ -1,8 +1,8 @@
 library(parallel)
 library(deSolve)
 library(nloptr)
-#setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
-setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
+setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
+#setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 
 rmse <- function(observed, predicted){
   sqrt(mean((observed-predicted)^2))
@@ -296,7 +296,7 @@ wrapper_opt <- function(X){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(5,-3)
+  x0 <- c(8,2)
   params_names <- c("kon", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "Ka", "C_prot_init")
@@ -304,8 +304,8 @@ wrapper_opt <- function(X){
 
   # the selected settings for the optimizer
   opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-                "xtol_rel" = 1e-10,
-                "ftol_rel" = 1e-10,
+                "xtol_rel" = 1e-7,
+                "ftol_rel" = 1e-7,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
                 "maxeval" = 3000,
@@ -317,8 +317,8 @@ wrapper_opt <- function(X){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(2,-4),
-                                   ub =   c(10,5),
+                                   lb	=  c(-20,-20),
+                                   ub =   c(20,20),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -352,9 +352,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c( 5e-3, 1e-2, 5e-2))
-C_prot_init_values <- log10(c( 5e-4, 1e-3, 5e-3))
-ka_values = log10(c(1e3, 5e3, 1e4))
+ku_values <- log10(c( 1e-2, 2e-2, 5e-2))
+C_prot_init_values <- log10(c(2e-6))
+ka_values = log10(c(1e3))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
