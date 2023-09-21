@@ -21,24 +21,24 @@ WSSR <- function(observed, predicted, weights, comp.names =NULL){
   if (length(observed) != length(predicted) || length(observed) != length(weights)){
     stop(" The observations, predictions and weights must have the same compartments")
   }
-
+  
   # Define the number of observed outputs
   N_outputs <- length(predicted)
   # Define the number of observations per output
   N_obs <- rep(NA, N_outputs)
-
+  
   # A vector to store the values of the weighted squared sum residuals of each compartment
   outputs_res <- c()
   for (i in 1:N_outputs) { # loop over the observed outputs
     N_obs[i] <- length(observed[[i]])
-
+    
     # Check that all observed, predicted and weights vectors have the same length
     if(N_obs[i] != length(predicted[[i]]) || N_obs[i] != length(weights[[i]])){
       stop(paste0("Compartment ",i," had different length in the observations and predictions"))
     }
     # The number of observations for output i
     N <- N_obs[i]
-
+    
     # Initiate a variable to estimate the sum of squared residuals for output j
     sq_weighted_res_j <- 0
     for (j in 1:N) { #loop over the experimental points i compartment i
@@ -46,9 +46,9 @@ WSSR <- function(observed, predicted, weights, comp.names =NULL){
     }
     outputs_res[i] <- sq_weighted_res_j
   }
-
+  
   WSSR_results <- sum(outputs_res)
-
+  
   # Name the list of compartment discrepancy indices
   if ( !is.null(comp.names)){
     names(WSSR_results) <- comp.names
@@ -59,7 +59,7 @@ WSSR <- function(observed, predicted, weights, comp.names =NULL){
   } else if (!is.null(names(weights)) && is.null(comp.names) ){
     names(WSSR_results) <- names(weights)
   }
-
+  
   return(WSSR_results)
 }
 
@@ -71,19 +71,19 @@ WSSR <- function(observed, predicted, weights, comp.names =NULL){
 # Input: age [days], temperature [oC], food["low"/"high"]/ Output: length [mm]
 # Considers female D. magna
 Size_estimation <<- function(age, temperature = 22, food="high"){
-
+  
   # T = 15 o C
   a_low_15 <-0.354
   b_low_15 <- 0.527
   a_high_15 <- 0.105
   b_high_15 <- 0.953
-
+  
   # T = 25 o C
   a_low_25 <- 0.811
   b_low_25 <- 0.355
   a_high_25 <- 0.698
   b_high_25 <- 0.83
-
+  
   if(food == "low"){
     if(temperature <= 15){
       a <- a_low_15
@@ -115,7 +115,7 @@ Size_estimation <<- function(age, temperature = 22, food="high"){
 # Dumont et al. (1975)
 # Input: length [mm]/ Output: dry weight[mg]
 dry_weight_estimation <<- function(L){
-
+  
   w1 = (1.89e-06*(L*1000)^2.25)/1000 #Donka Lake
   w2 = (4.88e-05*(L*1000)^1.80)/1000 #River Sambre
   # Selected w1 after validation with Martin-Creuzburg et al. (2018
@@ -135,19 +135,19 @@ ode_func <- function(time, inits, params){
     # C_daphnia_unbound/C_daphnia_bound: mol PFAS/L D.magna
     # C_daphnia_unbound_unmol/C_daphnia_bound_unmol: ng PFAS/g D.magna
     # C_prot_un: mol prot/L
-
+    
     age <- init_age + time
     #size in mm
     size <- Size_estimation(age, temperature = 23, food="high")
-
-
+    
+    
     # dry weight mg
     DW <- dry_weight_estimation(size)
     # Convert DW to WW
     WW <- 15.5 * DW  # Conversion rate 11-20 from DW to WW (Garner et al., 2018)
     # Another post discussing DW to WW can be accessed through:
     #https://www.madsci.org/posts/archives/2005-09/1127049424.Zo.r.html
-
+    
     # Water concentration in ng/L
     dCw <- 0
     
@@ -166,7 +166,7 @@ ode_func <- function(time, inits, params){
     
     
     dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/(WW/1000)  - kon*C_prot_un*C_daphnia_unbound +
-                           koff*C_daphnia_bound - ke*C_daphnia_unbound
+      koff*C_daphnia_bound - ke*C_daphnia_unbound
     dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
     dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
     
@@ -186,7 +186,7 @@ ode_func <- function(time, inits, params){
 obj_f <- function(x, params_names, constant_theta, constant_theta_names,
                   constant_params=NULL,data_df, errors_df,
                   PFAS_name, Cwater, age, temperatures, MW){
-
+  
   # Assign the values of the x vector to the corresponding parameters
   if(!is.null(constant_theta)){
     if(length(constant_theta_names) != length(constant_theta)){
@@ -203,13 +203,13 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
   for (k in 1:length(x)) {
     assign(params_names[k], x[k])
   }
-
+  
   if(!is.null(constant_params)){
     for (k in 1:length(constant_params)) {
       assign(names(constant_params)[k], constant_params[[k]])
     }
   }
-
+  
   # Indexes of body burden and exposure time in data frame
   BB_index <- c(2,4,6)
   ExpTime_index <- c(1,3,5)
@@ -220,7 +220,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
   score <- rep(NA, length(temperatures))
   # Load PFAS data
   df <- data_df
-
+  
   # Iterate over number of distinct temperature used in the experiment
   for (temp_iter in 1:length(temperatures)){
     # Initial water concentration of PFAS at selected temperature
@@ -234,30 +234,30 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
     # Time used by numerical solver that integrates the system of ODE
     sol_times <- seq(0,15, 0.1 )
     # Fitted parameters
-
-
+    
+    
     inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
-                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
-
+                "C_daphnia_bound" = 0, "C_prot_un" = 10^C_prot_init)
+    
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku,
                 "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-6, atol = 1e-6))
-
+                                        rtol = 1e-7, atol = 1e-7))
+    
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
       score[temp_iter] <- rmse(BodyBurden, results)
     }else{
-     # stop(print("Length of predictions is not equal to the length of data"))
+      # stop(print("Length of predictions is not equal to the length of data"))
       score[temp_iter]=50000 
-      }
-
+    }
+    
     #score[temp_iter] <- rmse(BodyBurden, results)
   }
-
+  
   # Take the average score of all PFAS and temperatures
   final_score <- mean(score)
   return(final_score)
@@ -267,58 +267,58 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
 
 # This is a wrapper for the optimization process in order to work in parallel
 wrapper_opt <- function(X){
-
-  PFAS_names <- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA",
-                  "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
-  Molecular_weights <- list("PFBA" = 214, "F-53B" = 570, "GenX" = 330, "PFBS" = 300, "PFDA" = 514,
+  PFAS_names <<- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA",
+                   "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
+  Molecular_weights<<- list("PFBA" = 214, "F-53B" = 570, "GenX" = 330, "PFBS" = 300, "PFDA" = 514,
                             "PFDoA" = 614, "PFHpA" = 364, "PFHxA" = 314,"PFNA" = 464, "PFOA" = 414,  "PFOS" = 500,
                             "PFPeA" = 364, "PFUnA" = 564)
   data_ls <- list()
   data_plot <- list()
-
+  
   for(sheet_name in PFAS_names){
     data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
     data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
   }
-
+  
   # Water concentration in ng/mL
-  Cwater = matrix(c(1.44, 4.05, 9.56, 19.40, 18.5, 22.7, 22.5, 22.9, 22.6, 23.2,22.9,17.3, 22.5,
-                    2.05, 4.73, 10.4, 20.4, 19.6, 23.2, 23.7, 23.6, 23.4, 22.7, 23.2, 19.2, 23.5,
-                    2.31, 5.3, 12.1, 21.5, 21.9, 25.0, 25.2, 25.8, 26.9, 25.7, 24.6, 21.9, 24.8), ncol = 3)
-  colnames(Cwater) <-  c("16oC", "20oC", "24oC")
-  rownames(Cwater) <- PFAS_names
+  Cwater <<- matrix(c(1.44, 4.05, 9.56, 19.40, 18.5, 22.7, 22.5, 22.9, 22.6, 23.2,22.9,17.3, 22.5,
+                      2.05, 4.73, 10.4, 20.4, 19.6, 23.2, 23.7, 23.6, 23.4, 22.7, 23.2, 19.2, 23.5,
+                      2.31, 5.3, 12.1, 21.5, 21.9, 25.0, 25.2, 25.8, 26.9, 25.7, 24.6, 21.9, 24.8), ncol = 3, 
+                    dimnames = list(  PFAS_names, c("16oC", "20oC", "24oC")))
+  
   # Convert water concentration in ng/L
-  Cwater = Cwater*1000
+  Cwater <<- Cwater*1000
   age = 7+7 # age of D.magna at the beginning of exposure in days
-  temperatures <- c(16, 20, 24) #experiment temperature in oC
-
+  temperatures <<- c(16, 20, 24) #experiment temperature in oC
+  
+  
   #x, constant_theta, constant_theta_names, params_names,
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(8,2)
+  x0 <- c(0,-1)
   params_names <- c("kon", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "Ka", "C_prot_init")
   constant_params <- NULL
-
+  
   # the selected settings for the optimizer
   opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
                 "xtol_rel" = 1e-7,
                 "ftol_rel" = 1e-7,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
-                "maxeval" = 3000,
+                "maxeval" = 4000,
                 "print_level" = 1)
-
+  
   opt_params_per_substance <- list()
   score_per_substance <- c()
-
+  
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-20,-20),
-                                   ub =   c(20,20),
+                                   lb	=  c(-4,-3),
+                                   ub =   c(3,3),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -331,7 +331,7 @@ wrapper_opt <- function(X){
                                    temperatures=temperatures,
                                    MW=Molecular_weights[[PFAS_names[i]]],
                                    opts = opts
-                                   )
+    )
     score_per_substance[i] <- optimization$objective
     names(score_per_substance)[i] <- PFAS_names[i]
     opt_params_per_substance[[i]] <- optimization$solution
@@ -341,9 +341,110 @@ wrapper_opt <- function(X){
               "Overall_score"=mean(score_per_substance),
               "opt_params_per_substance"=opt_params_per_substance))
 }
-
+####
+###
+##---------------------------------
+# fuction for plotting results
+##---------------------------------
+###
+####
+plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
+  library(ggplot2)
+  setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots")
+  
+  # Age of D.magna at beginning of exposure
+  init_age <- age
+  # Create a counter to mark the position of fitted parameters of x
+  # that corresponds to a specific combination of PFAS and temperature
+  
+  # Load PFAS data
+  df <- PFAS_data[[PFAS_name]]
+  # Load parameters
+  parameters <- params
+  # Time used by numerical solver that integrates the system of ODE
+  sol_times <- seq(0,15, 0.1 )
+  # Data frame to store predictions for each temperature
+  predictions <- data.frame("time" = sol_times, "BB_16" = rep(NA, length(sol_times)),
+                            "BB_20" = rep(NA, length(sol_times)), "BB_24" = rep(NA, length(sol_times)))
+  ku <- unname(parameters[1])
+  kon <-  unname(parameters[2])
+  Ka <-  unname(parameters[3])
+  ke <- unname(parameters[4])
+  C_prot_init <- 10^unname(parameters[5])
+  # Iterate over number of distinct temperature used in the experiment
+  for (temp_iter in 1:length(temperatures)){
+    # Initial water concentration of PFAS at selected temperature
+    C_water <-  Cwater[PFAS_name,temp_iter]
+    # Temperature of experiment
+    Temp <- temperatures[temp_iter]
+    # Fitted parameters
+    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
+                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
+    
+    params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
+                "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
+    solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
+                                        y = inits,
+                                        parms = params,
+                                        method="lsodes",
+                                        rtol = 1e-7, atol = 1e-7))
+    
+    predictions[,temp_iter+1] <- solution$C_tot
+  }
+  ggplot()+
+    geom_line(data = predictions, aes(x=time, y=BB_16,  colour = "16oC"), size=1.7)+
+    geom_line(data = predictions, aes(x=time, y=BB_20, colour = "20oC"), size=1.7)+
+    geom_line(data = predictions, aes(x=time, y=BB_24, colour = "24oC"), size=1.7)+
+    geom_point(data = df, aes(x=time_16  , y=BB_16 ,  colour = "16oC"), size=5)+
+    geom_point(data = df, aes(x=time_20, y=BB_20,  colour = "20oC"), size=5)+
+    geom_point(data = df, aes(x=time_24, y=BB_24,  colour = "24oC"), size=5)+
+    
+    labs(title = paste(PFAS_name,"body burden in D.magna", sep = " "),
+         y = "Body burden (ng/g WW)", x = "Time (days)")+
+    scale_colour_manual("Temperature", 
+                        breaks = c("16oC", "20oC", "24oC"),
+                        values = c("red", "green", "blue")) +
+    theme(plot.title = element_text(hjust = 0.5,size=30), 
+          axis.title.y =element_text(hjust = 0.5,size=25,face="bold"),
+          axis.text.y=element_text(size=22),
+          axis.title.x =element_text(hjust = 0.5,size=25,face="bold"),
+          axis.text.x=element_text(size=22),
+          legend.title=element_text(hjust = 0.5,size=25), 
+          legend.text=element_text(size=22)) + 
+    
+    theme(legend.key.size = unit(1.5, 'cm'),  
+          legend.title = element_text(size=14),
+          legend.text = element_text(size=14),
+          axis.text = element_text(size = 14))
+  ggsave(paste0(PFAS_name,".png"), width = 20, height = 20, units = "cm")
+}
 
 ################################################################################
+PFAS_names <<- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA",
+                 "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
+Molecular_weights<<- list("PFBA" = 214, "F-53B" = 570, "GenX" = 330, "PFBS" = 300, "PFDA" = 514,
+                          "PFDoA" = 614, "PFHpA" = 364, "PFHxA" = 314,"PFNA" = 464, "PFOA" = 414,  "PFOS" = 500,
+                          "PFPeA" = 364, "PFUnA" = 564)
+data_ls <- list()
+data_plot <- list()
+
+for(sheet_name in PFAS_names){
+  data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
+  #data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+  
+   data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+}
+
+# Water concentration in ng/mL
+Cwater <<- matrix(c(1.44, 4.05, 9.56, 19.40, 18.5, 22.7, 22.5, 22.9, 22.6, 23.2,22.9,17.3, 22.5,
+                    2.05, 4.73, 10.4, 20.4, 19.6, 23.2, 23.7, 23.6, 23.4, 22.7, 23.2, 19.2, 23.5,
+                    2.31, 5.3, 12.1, 21.5, 21.9, 25.0, 25.2, 25.8, 26.9, 25.7, 24.6, 21.9, 24.8), ncol = 3, 
+                  dimnames = list(  PFAS_names, c("16oC", "20oC", "24oC")))
+
+# Convert water concentration in ng/L
+Cwater <<- Cwater*1000
+age = 7+7 # age of D.magna at the beginning of exposure in days
+temperatures <<- c(16, 20, 24) #experiment temperature in oC
 
 # In this section, various values will be employed for the parameters Ku,
 # C_prot_init, and kon. Following each parameter combination, the remaining
@@ -352,9 +453,9 @@ wrapper_opt <- function(X){
 # to derive conclusions.
 
 # Here are the values of the parameters that will be tested
-ku_values <- log10(c( 1e-2, 2e-2, 5e-2))
-C_prot_init_values <- log10(c(2e-6))
-ka_values = log10(c(1e3))
+ku_values <- log10(c(3e-1, 4e-1))
+C_prot_init_values <- log10(c( 3e-6, 4e-6))
+ka_values <- log10(c(1e7,1.5e7))
 
 
 # Generate all possible combinations of the parameters for each PFAS substance
@@ -369,7 +470,6 @@ for (i in 1:length(ku_values)) {
   }
 }
 
-
 input_ls = fixed_params
 start.time <- Sys.time()
 # Set up the cluster.
@@ -380,11 +480,27 @@ clusterExport(cl=cluster,c("obj_f", "rmse", "ode_func",
 output <- parLapply(cluster, input_ls, wrapper_opt)
 # Terminate the cluster.
 stopCluster(cluster)
-total.duration <- Sys.time() - start.time
-
 
 scores <- c()
 for (i in 1:length(output)) {
   scores[i] <- output[[i]]$Overall_score
 }
-print(output[which.min(scores)])
+#extract parameters that yielded the best fit
+best_params <- output[which.min(scores)]
+# Create plots of the best fit
+parameters <- list()
+for (i in 1:length(PFAS_names)){
+  MW <- Molecular_weights[[PFAS_names[i]]]
+  # Fitted parameters
+  ku <- best_params[[1]]$Fixed_params_used["ku"]
+  kon <-  best_params[[1]]$opt_params_per_substance[PFAS_names[i]][[1]][1]
+  Ka <-  best_params[[1]]$Fixed_params_used["Ka"]
+  ke <- best_params[[1]]$opt_params_per_substance[PFAS_names[i]][[1]][2]
+  C_prot_init <- best_params[[1]]$Fixed_params_used["C_prot_init"]
+  parameters[[PFAS_names[i]]] <-c(ku, kon, Ka, ke, C_prot_init)
+  names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","Ka", "ke", "C_prot_init")
+  
+  plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_plot,
+            PFAS_name  = PFAS_names[i], 
+            Cwater = Cwater, age = age,  temperatures = temperatures, MW = MW )
+}
