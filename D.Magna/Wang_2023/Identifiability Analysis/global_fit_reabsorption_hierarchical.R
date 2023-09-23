@@ -165,7 +165,7 @@ ode_func <- function(time, inits, params){
     
     
     dC_main <-  ku*(Cw*1e-09/MW)/(WW/1000)  - kfil*C_main + kreabs*C_filtrate
-    dC_filtrate <-  kfil*C_main - kreabs*C_filtrate - kexcretion*C_main
+    dC_filtrate <-  kfil*C_main - kreabs*C_filtrate - kexcretion*C_filtrate
 
     # Multiply MW by 1e09 to convert g/mol to ng/mol and then 
     # divide by the density of water to to make L to g wet weight
@@ -241,7 +241,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-5, atol = 1e-5))
+                                        rtol = 1e-7, atol = 1e-7))
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
@@ -262,7 +262,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
 
 
 # This is a wrapper for the optimization process in order to work in parallel
-wrapper_opt <- function(X){
+wrapper_opt <- function(X, opts){
   PFAS_names <<- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA",
                    "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
   Molecular_weights<<- list("PFBA" = 214, "F-53B" = 570, "GenX" = 330, "PFBS" = 300, "PFDA" = 514,
@@ -298,15 +298,6 @@ wrapper_opt <- function(X){
   constant_theta = X
   constant_theta_names =  c("ku", "kexcretion", "kfil")
   constant_params <- NULL
-  
-  # the selected settings for the optimizer
-  opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-                "xtol_rel" = 1e-5,
-                "ftol_rel" = 1e-5,
-                "ftol_abs" = 0,
-                "xtol_abs" = 0 ,
-                "maxeval" = 500,
-                "print_level" = 0)
   
   opt_params_per_substance <- list()
   score_per_substance <- c()
@@ -383,7 +374,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-5, atol = 1e-5))
+                                        rtol = 1e-7, atol = 1e-7))
     
     predictions[,temp_iter+1] <- solution$C_tot
   }
@@ -408,7 +399,7 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
           legend.title=element_text(hjust = 0.5,size=25), 
           legend.text=element_text(size=22)) + 
     
-    theme(legend.kreabsy.size = unit(1.5, 'cm'),  
+    theme(legend.key.size = unit(1.5, 'cm'),  
           legend.title = element_text(size=14),
           legend.text = element_text(size=14),
           axis.text = element_text(size = 14))
@@ -417,8 +408,8 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
 
 ################################################################################
 
-level_1<- function(x0){
-  return(wrapper_opt(x0)$Overall_score)
+level_1<- function(x0, opts){
+  return(wrapper_opt(x0, opts)$Overall_score)
 }
 # the selected settings for the optimizer
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
@@ -440,6 +431,16 @@ optimization <- nloptr::nloptr(x0 = x01,
                                ub =   c(3,5,5),
                                opts = opts
 )
+# the selected settings for the optimizer
+opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
+              "xtol_rel" = 1e-7,
+              "ftol_rel" = 1e-7,
+              "ftol_abs" = 0,
+              "xtol_abs" = 0 ,
+              "maxeval" = 4000,
+              "print_level" = 1)
+parameters <- optimization$solution
+best_params <- wrapper_opt(parameters, opts)
 
 PFAS_names <<- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA",
                  "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
@@ -472,13 +473,12 @@ parameters <- list()
 for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[[PFAS_names[i]]]
   # Fitted parameters
-  ku <- best_params[[1]]$Fixed_params_used["ku"]
-  kexcretion <-  best_params[[1]]$Fixed_params_used["kexcretion"]
-  kfil <-    best_params[[1]]$opt_params_per_substance[PFAS_names[i]][[1]][1]
-  kreabs <- best_params[[1]]$opt_params_per_substance[PFAS_names[i]][[1]][2]
-  C_prot_init <- best_params[[1]]$Fixed_params_used["C_prot_init"]
-  parameters[[PFAS_names[i]]] <-c(ku, kexcretion, kfil, kreabs, C_prot_init)
-  names(parameters[[PFAS_names[i]]]) = c("ku",  "kexcretion","kfil", "kreabs", "C_prot_init")
+  ku <- best_params$Fixed_params_used[1]
+  kexcretion <-  best_params$Fixed_params_used[2]
+  kfil <-    best_params$Fixed_params_used[3]
+  kreabs <- best_params$opt_params_per_substance[PFAS_names[i]][[1]]
+  parameters[[PFAS_names[i]]] <-c(ku, kexcretion, kfil, kreabs)
+  names(parameters[[PFAS_names[i]]]) = c("ku",  "kexcretion","kfil", "kreabs")
   
   plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_plot,
             PFAS_name  = PFAS_names[i], 
