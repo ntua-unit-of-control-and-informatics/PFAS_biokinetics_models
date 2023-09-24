@@ -1,11 +1,24 @@
 library(parallel)
 library(deSolve)
 library(nloptr)
-setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
+setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 #setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 
 rmse <- function(observed, predicted){
   sqrt(mean((observed-predicted)^2))
+}
+
+AAFE <- function(observations, predictions, times=NULL){
+  y_obs <- unlist(observations)
+  y_pred <- unlist(predictions)
+  # Total number of observations
+  N<- length(y_obs)
+  log_ratio <- rep(NA, N) 
+  for ( i in 1:N){
+    log_ratio[i] <- abs(log((y_pred[i]/y_obs[i]), base = 10))
+  }
+  aafe <- 10^(sum(log_ratio)/N) 
+  return(aafe)
 }
 
 #=====================================#
@@ -245,7 +258,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
-      score[temp_iter] <- rmse(BodyBurden, results)
+      score[temp_iter] <- AAFE(BodyBurden, results)
     }else{
       # stop(print("Length of predictions is not equal to the length of data"))
       score[temp_iter]=50000 
@@ -262,7 +275,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
 
 
 # This is a wrapper for the optimization process in order to work in parallel
-wrapper_opt <- function(X, opts){
+wrapper_opt <- function(X, options){
   PFAS_names <<- c("PFBA", "F-53B", "GenX", "PFBS", "PFDA", "PFDoA", "PFHpA",
                    "PFHxA", "PFNA", "PFOA", "PFOS", "PFPeA", "PFUnA")
   Molecular_weights<<- list("PFBA" = 214, "F-53B" = 570, "GenX" = 330, "PFBS" = 300, "PFDA" = 514,
@@ -318,7 +331,7 @@ wrapper_opt <- function(X, opts){
                                    Cwater=Cwater[PFAS_names[i],],
                                    temperatures=temperatures,
                                    MW=Molecular_weights[[PFAS_names[i]]],
-                                   opts = opts
+                                   opts = options
     )
     score_per_substance[i] <- optimization$objective
     names(score_per_substance)[i] <- PFAS_names[i]
@@ -338,7 +351,7 @@ wrapper_opt <- function(X, opts){
 ####
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/reabsorption")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -408,8 +421,8 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
 
 ################################################################################
 
-level_1<- function(x0, opts){
-  return(wrapper_opt(x0, opts)$Overall_score)
+level_1<- function(x0, options){
+  return(wrapper_opt(x0, options)$Overall_score)
 }
 # the selected settings for the optimizer
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
@@ -419,6 +432,8 @@ opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN
               "xtol_abs" = 0 ,
               "maxeval" = 500,
               "print_level" = 1)
+options = opts
+options["print_level"] = 0
 
 #x, constant_theta, constant_theta_names, params_names,
 # constant_params=NULL,data_df, error_df
@@ -429,6 +444,7 @@ optimization <- nloptr::nloptr(x0 = x01,
                                eval_f = level_1,
                                lb	=  c(-3,-5,-5),
                                ub =   c(3,5,5),
+                               options = options,
                                opts = opts
 )
 # the selected settings for the optimizer
