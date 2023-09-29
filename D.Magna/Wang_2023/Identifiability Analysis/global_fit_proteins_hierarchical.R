@@ -1,7 +1,7 @@
 library(parallel)
 library(deSolve)
 library(nloptr)
-setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
+setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 #setwd("/Users/elenistrompoula/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023")
 
 rmse <- function(observed, predicted){
@@ -385,7 +385,7 @@ wrapper_opt <- function(X, options){
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
                                    lb	=  c(3,-3),
-                                   ub =   c(8,3),
+                                   ub =   c(8,4),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -417,7 +417,7 @@ wrapper_opt <- function(X, options){
 ####
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins")
+  setwd("C:/Users/ptsir/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
