@@ -20,6 +20,60 @@ AAFE <- function(observations, predictions, times=NULL){
   aafe <- 10^(sum(log_ratio)/N) 
   return(aafe)
 }
+PBKOF <- function(observed, predicted, comp.names =NULL){
+  # Check if the user provided the correct input format
+  if (!is.list(observed) || !is.list(predicted)){
+    stop(" The observations and predictions must be lists")
+  }
+  # Check if the user provided equal length lists
+  if (length(observed) != length(predicted)){
+    stop(" The observations and predictions must have the same compartments")
+  }
+  Ncomp <- length(observed) # Number of compartments
+  I <- rep(NA, Ncomp) # Compartment discrepancy index
+  N_obs <- rep(NA, Ncomp) #Number of observations per compartment
+  #loop over the compartments
+  for (i in 1:Ncomp){
+    Et <- 0 #relative error with observations
+    St <- 0  #relative error with simulations
+    N <- length(observed[[i]]) # number of observations for compartment i
+    # Check if observations and predictions have equal length
+    if(N != length(predicted[[i]])){
+      stop(paste0("Compartment ",i," had different length in the observations and predictions"))
+    }
+    N_obs[i] <- N # populate the N_obs vector
+    for (j in 1:N){
+      # sum of relative squared errors (error = observed - predicted)
+      Et <- Et + ( abs(observed[[i]][j] - predicted[[i]][j])  / observed[[i]][j] )  ^2
+      St <- St + ( abs(observed[[i]][j] - predicted[[i]][j])  / predicted[[i]][j] )  ^2
+    }
+    
+    # root mean of the square of observed values
+    RMEt <- sqrt(Et/N)
+    # root mean of the square of simulated values
+    RMSt <- sqrt( St/N)
+    
+    I[i] <- (RMEt + RMSt)/2   
+  }
+  # Total number of observations
+  Ntot <- sum(N_obs)
+  # Initialise the consolidated discrepancy index
+  Ic <-0
+  for (i in 1:Ncomp){
+    # Give weight to compartments with more observations (more information)
+    Ic <- Ic +  I[i]* N_obs[i]/Ntot
+  }
+  # Name the list of compartment discrepancy indices
+  if ( !is.null(comp.names)){
+    names(I) <- comp.names
+  }else if (!is.null(names(observed))){
+    names(I) <- names(observed)
+  } else if (!is.null(names(predicted)) && is.null(comp.names) ){
+    names(I) <- names(predicted)
+  }
+  return(Ic)
+  #return(list(Total_index = Ic, Compartment_index= I))
+}
 
 #=====================================#
 #  Weighted Sum of Squared Residuals  #
@@ -129,7 +183,7 @@ Size_estimation <<- function(age, temperature = 22, food="high"){
 # Input: length [mm]/ Output: dry weight[mg]
 dry_weight_estimation <<- function(L){
   
-  w1 = (1.89e-06*(L*1000)^2.25)/1000 #Donkfil Lakreabs
+  w1 = (1.89e-06*(L*1000)^2.25)/1000 #Donka Lake
   w2 = (4.88e-05*(L*1000)^1.80)/1000 #River Sambre
   # Selected w1 after validation with Martin-Creuzburg et al. (2018
   return(w1)
@@ -142,11 +196,13 @@ dry_weight_estimation <<- function(L){
 ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
     # Units explanation:
-    # kreabs: 1/day
-    # ku: Lwater/day/g Dmagna
+    # ke: 1/day
+    # ku: Lwater/day
     # Cw: ng PFAS/L water
-    # C_main/C_filtrate: ng PFAS/gD.magna
-
+    # C_daphnia_unbound/C_daphnia_bound: mol PFAS/L D.magna
+    # C_daphnia_unbound_unmol/C_daphnia_bound_unmol: ng PFAS/g D.magna
+    # C_prot_un: mol prot/L
+    
     age <- init_age + time
     #size in mm
     size <- Size_estimation(age, temperature = 23, food="high")
@@ -163,25 +219,32 @@ ode_func <- function(time, inits, params){
     dCw <- 0
     
     ku <- 10^ku
-    kreabs <- 10^kreabs
-    kexcretion <- 10^kexcretion
-    kfil <- 10^kfil 
-
-    # Reported values for kexcretion and koff range between 1e2-1e04 and 1e-3-1e-1 in L/mol/s
+    ke <- 10^ke
+    kon <- (10^kon)*60*60*24 #convert to mol/l/d
+    Ka <- 10^Ka 
+    koff <- kon/Ka
+    
+    # Reported values for Kon and koff range between 1e2-1e04 and 1e-3-1e-1 in L/mol/s
     # and s-^-1 respectively. Our concentrations are in ng/g. Assuming density = 1000g/L
-    # then the concentration in ng/g is multyplied by 1000 to makreabs it ng/L and then by
-    # multiply by 1e-9 to makreabs it grams and divide by MW. We do this directly to kexcretion
-    # and koff to makreabs the concentration mol/L so that we can match the literature
-    # values of kexcretion and koff with ours
+    # then the concentration in ng/g is multyplied by 1000 to make it ng/L and then by
+    # multiply by 1e-9 to make it grams and divide by MW. We do this directly to kon
+    # and koff to make the concentration mol/L so that we can match the literature
+    # values of kon and koff with ours
     
     
-    dC_main <-  ku*Cw  - kfil*C_main + kreabs*C_filtrate
-    dC_filtrate <-  kfil*C_main - kreabs*C_filtrate - kexcretion*C_filtrate
-
-    C_tot <- C_main+ C_filtrate
+    dC_daphnia_unbound <-  ku*(Cw*1e-09/MW)/(WW/1000)  - kon*C_prot_un*C_daphnia_unbound +
+      koff*C_daphnia_bound - ke*C_daphnia_unbound
+    dC_daphnia_bound <- kon*C_prot_un*C_daphnia_unbound - koff*C_daphnia_bound
+    dC_prot_un <-   koff*C_daphnia_bound -  kon*C_prot_un*C_daphnia_unbound
     
-    return(list(c("dCw" = dCw,   "dC_main" = dC_main,
-                  "dC_filtrate" = dC_filtrate),
+    # Multiply MW by 1e09 to convert g/mol to ng/mol and then 
+    # divide by the density of water to make L to g wet weight
+    C_daphnia_unbound_unmol <- C_daphnia_unbound*(MW*1e9)/1000
+    C_daphnia_bound_unmol <- C_daphnia_bound*(MW*1e9)/1000
+    C_tot <- C_daphnia_unbound_unmol + C_daphnia_bound_unmol
+    
+    return(list(c("dCw" = dCw,   "dC_daphnia_unbound" = dC_daphnia_unbound,
+                  "dC_daphnia_bound" = dC_daphnia_bound, "dC_prot_un" = dC_prot_un),
                 "WW" = WW, "C_tot" = C_tot))
   })
 }
@@ -239,11 +302,11 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
     # Fitted parameters
     
     
-    inits <- c( "Cw" = C_water,  "C_main" = 0,
-                "C_filtrate" = 0)
+    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
+                "C_daphnia_bound" = 0, "C_prot_un" = 10^C_prot_init)
     
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku,
-                "kexcretion" = kexcretion, "kfil" = kfil, "kreabs"= kreabs, "MW" = MW)
+                "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
@@ -251,8 +314,8 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
                                         rtol = 1e-7, atol = 1e-7))
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
-      results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
-      score[temp_iter] <- AAFE(BodyBurden, results)
+      results <- (solution[which(round(solution$time,2) %in% exp_time), 'C_tot'])
+      score[temp_iter] <- PBKOF(as.list(BodyBurden), as.list(results))
     }else{
       # stop(print("Length of predictions is not equal to the length of data"))
       score[temp_iter]=50000 
@@ -261,7 +324,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
     #score[temp_iter] <- rmse(BodyBurden, results)
   }
   
-  # Takreabs the average score of all PFAS and temperatures
+  # Take the average score of all PFAS and temperatures
   final_score <- mean(score)
   return(final_score)
 }
@@ -299,12 +362,21 @@ wrapper_opt <- function(X, options){
   #x, constant_theta, constant_theta_names, params_names,
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
-  # x0 contains the initial values of the kfil and kreabs
-  x0 <- c(2)
-  params_names <- c("kreabs")
+  # x0 contains the initial values of the Ka and ke
+  x0 <- c(5,1)
+  params_names <- c("Ka", "ke")
   constant_theta = X
-  constant_theta_names =  c("ku", "kexcretion", "kfil")
+  constant_theta_names =  c("ku", "kon", "C_prot_init")
   constant_params <- NULL
+  
+  # the selected settings for the optimizer
+  opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
+                "xtol_rel" = 1e-5,
+                "ftol_rel" = 1e-5,
+                "ftol_abs" = 0,
+                "xtol_abs" = 0 ,
+                "maxeval" = 500,
+                "print_level" = 0)
   
   opt_params_per_substance <- list()
   score_per_substance <- c()
@@ -312,8 +384,8 @@ wrapper_opt <- function(X, options){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-10),
-                                   ub =   c(10),
+                                   lb	=  c(3,-3),
+                                   ub =   c(8,3),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -345,7 +417,7 @@ wrapper_opt <- function(X, options){
 ####
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/reabsorption")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins/PBKOF")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -362,9 +434,10 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
   predictions <- data.frame("time" = sol_times, "BB_16" = rep(NA, length(sol_times)),
                             "BB_20" = rep(NA, length(sol_times)), "BB_24" = rep(NA, length(sol_times)))
   ku <- unname(parameters[1])
-  kexcretion <-  unname(parameters[2])
-  kfil <-  unname(parameters[3])
-  kreabs <- unname(parameters[4])
+  kon <-  unname(parameters[2])
+  Ka <-  unname(parameters[3])
+  ke <- unname(parameters[4])
+  C_prot_init <- 10^unname(parameters[5])
   # Iterate over number of distinct temperature used in the experiment
   for (temp_iter in 1:length(temperatures)){
     # Initial water concentration of PFAS at selected temperature
@@ -372,16 +445,16 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
     # Temperature of experiment
     Temp <- temperatures[temp_iter]
     # Fitted parameters
-    inits <- c( "Cw" = C_water,  "C_main" = 0,
-                "C_filtrate" = 0)
+    inits <- c( "Cw" = C_water,  "C_daphnia_unbound" = 0,
+                "C_daphnia_bound" = 0, "C_prot_un" = C_prot_init)
     
     params <- c("init_age"=age, "Temp" = Temp, "ku"= ku, 
-                "kexcretion" = kexcretion, "kfil" = kfil, "kreabs"= kreabs, "MW" = MW)
+                "kon" = kon, "Ka" = Ka, "ke"= ke, "MW" = MW)
     solution <- data.frame(deSolve::ode(times = sol_times,  func = ode_func,
                                         y = inits,
                                         parms = params,
                                         method="lsodes",
-                                        rtol = 1e-7, atol = 1e-7))
+                                        rtol = 1e-5, atol = 1e-5))
     
     predictions[,temp_iter+1] <- solution$C_tot
   }
@@ -414,7 +487,6 @@ plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW)
 }
 
 ################################################################################
-
 level_1<- function(x0, options){
   return(wrapper_opt(x0, options)$Overall_score)
 }
@@ -432,12 +504,12 @@ options["print_level"] = 0
 #x, constant_theta, constant_theta_names, params_names,
 # constant_params=NULL,data_df, error_df
 # x0 must be given in log10-scale
-# x0 contains the initial values of the kfil and kreabs
-x01 <-  log10(c(0.5, 0.1,0.1)) #ku, kexcretion, kfil
+# x0 contains the initial values of the Ka and ke
+x01 <-  log10(c(0.01,  1e4,1e-5)) #ku, kon, c_prot_init
 optimization <- nloptr::nloptr(x0 = x01,
                                eval_f = level_1,
-                               lb	=  c(-3,-5,-5),
-                               ub =   c(3,5,5),
+                               lb	=  c(-3,-1,-6),
+                               ub =   c(3,6,-3),
                                options = options,
                                opts = opts
 )
@@ -484,11 +556,12 @@ for (i in 1:length(PFAS_names)){
   MW <- Molecular_weights[[PFAS_names[i]]]
   # Fitted parameters
   ku <- best_params$Fixed_params_used[1]
-  kexcretion <-  best_params$Fixed_params_used[2]
-  kfil <-    best_params$Fixed_params_used[3]
-  kreabs <- best_params$opt_params_per_substance[PFAS_names[i]][[1]]
-  parameters[[PFAS_names[i]]] <-c(ku, kexcretion, kfil, kreabs)
-  names(parameters[[PFAS_names[i]]]) = c("ku",  "kexcretion","kfil", "kreabs")
+  kon <-  best_params$Fixed_params_used[2]
+  Ka <-    best_params$opt_params_per_substance[PFAS_names[i]][[1]][1]
+  ke <-  best_params$opt_params_per_substance[PFAS_names[i]][[1]][2]
+  C_prot_init <- best_params$Fixed_params_used[3]
+  parameters[[PFAS_names[i]]] <-c(ku, kon, Ka, ke, C_prot_init)
+  names(parameters[[PFAS_names[i]]]) = c("ku",  "kon","Ka", "ke", "C_prot_init")
   
   plot_func(params = parameters[[PFAS_names[i]]], PFAS_data = data_plot,
             PFAS_name  = PFAS_names[i], 

@@ -143,10 +143,12 @@ ode_func <- function(time, inits, params){
   with(as.list(c(inits, params)),{
     # Units explanation:
     # kreabs: 1/day
-    # ku: Lwater/day/g Dmagna
+    # ku: Lwater/day
     # Cw: ng PFAS/L water
-    # C_main/C_filtrate: ng PFAS/gD.magna
-
+    # C_main/C_filtrate: mol PFAS/L D.magna
+    # C_main_unmol/C_filtrate_unmol: ng PFAS/g D.magna
+    # C_prot_un: mol prot/L
+    
     age <- init_age + time
     #size in mm
     size <- Size_estimation(age, temperature = 23, food="high")
@@ -175,10 +177,14 @@ ode_func <- function(time, inits, params){
     # values of kexcretion and koff with ours
     
     
-    dC_main <-  ku*Cw  - kfil*C_main + kreabs*C_filtrate
+    dC_main <-  ku*(Cw*1e-09/MW)/(WW/1000)  - kfil*C_main + kreabs*C_filtrate
     dC_filtrate <-  kfil*C_main - kreabs*C_filtrate - kexcretion*C_filtrate
 
-    C_tot <- C_main+ C_filtrate
+    # Multiply MW by 1e09 to convert g/mol to ng/mol and then 
+    # divide by the density of water to to make L to g wet weight
+    C_main_unmol <- C_main*(MW*1e9)/1000
+    C_filtrate_unmol <- C_filtrate*(MW*1e9)/1000
+    C_tot <- C_main_unmol + C_filtrate_unmol
     
     return(list(c("dCw" = dCw,   "dC_main" = dC_main,
                   "dC_filtrate" = dC_filtrate),
@@ -252,7 +258,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
-      score[temp_iter] <- AAFE(BodyBurden, results)
+      score[temp_iter] <- rmse(BodyBurden, results)
     }else{
       # stop(print("Length of predictions is not equal to the length of data"))
       score[temp_iter]=50000 
@@ -300,10 +306,10 @@ wrapper_opt <- function(X, options){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the kfil and kreabs
-  x0 <- c(2)
-  params_names <- c("kreabs")
+  x0 <- c(2,-1)
+  params_names <- c("kreabs", "kfil")
   constant_theta = X
-  constant_theta_names =  c("ku", "kexcretion", "kfil")
+  constant_theta_names =  c("ku", "kexcretion")
   constant_params <- NULL
   
   opt_params_per_substance <- list()
@@ -312,8 +318,8 @@ wrapper_opt <- function(X, options){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(-10),
-                                   ub =   c(10),
+                                   lb	=  c(-5,-5),
+                                   ub =   c(5,5),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -433,11 +439,11 @@ options["print_level"] = 0
 # constant_params=NULL,data_df, error_df
 # x0 must be given in log10-scale
 # x0 contains the initial values of the kfil and kreabs
-x01 <-  log10(c(0.5, 0.1,0.1)) #ku, kexcretion, kfil
+x01 <-  log10(c(0.5, 0.1)) #ku, kexcretion, kfil
 optimization <- nloptr::nloptr(x0 = x01,
                                eval_f = level_1,
-                               lb	=  c(-3,-5,-5),
-                               ub =   c(3,5,5),
+                               lb	=  c(-3,-5),
+                               ub =   c(3,5),
                                options = options,
                                opts = opts
 )
@@ -485,8 +491,8 @@ for (i in 1:length(PFAS_names)){
   # Fitted parameters
   ku <- best_params$Fixed_params_used[1]
   kexcretion <-  best_params$Fixed_params_used[2]
-  kfil <-    best_params$Fixed_params_used[3]
-  kreabs <- best_params$opt_params_per_substance[PFAS_names[i]][[1]]
+  kfil <-     best_params$opt_params_per_substance[PFAS_names[i]][[1]][2]
+  kreabs <- best_params$opt_params_per_substance[PFAS_names[i]][[1]][1]
   parameters[[PFAS_names[i]]] <-c(ku, kexcretion, kfil, kreabs)
   names(parameters[[PFAS_names[i]]]) = c("ku",  "kexcretion","kfil", "kreabs")
   

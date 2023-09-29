@@ -20,6 +20,60 @@ AAFE <- function(observations, predictions, times=NULL){
   aafe <- 10^(sum(log_ratio)/N) 
   return(aafe)
 }
+PBKOF <- function(observed, predicted, comp.names =NULL){
+  # Check if the user provided the correct input format
+  if (!is.list(observed) || !is.list(predicted)){
+    stop(" The observations and predictions must be lists")
+  }
+  # Check if the user provided equal length lists
+  if (length(observed) != length(predicted)){
+    stop(" The observations and predictions must have the same compartments")
+  }
+  Ncomp <- length(observed) # Number of compartments
+  I <- rep(NA, Ncomp) # Compartment discrepancy index
+  N_obs <- rep(NA, Ncomp) #Number of observations per compartment
+  #loop over the compartments
+  for (i in 1:Ncomp){
+    Et <- 0 #relative error with observations
+    St <- 0  #relative error with simulations
+    N <- length(observed[[i]]) # number of observations for compartment i
+    # Check if observations and predictions have equal length
+    if(N != length(predicted[[i]])){
+      stop(paste0("Compartment ",i," had different length in the observations and predictions"))
+    }
+    N_obs[i] <- N # populate the N_obs vector
+    for (j in 1:N){
+      # sum of relative squared errors (error = observed - predicted)
+      Et <- Et + ( abs(observed[[i]][j] - predicted[[i]][j])  / observed[[i]][j] )  ^2
+      St <- St + ( abs(observed[[i]][j] - predicted[[i]][j])  / predicted[[i]][j] )  ^2
+    }
+    
+    # root mean of the square of observed values
+    RMEt <- sqrt(Et/N)
+    # root mean of the square of simulated values
+    RMSt <- sqrt( St/N)
+    
+    I[i] <- (RMEt + RMSt)/2   
+  }
+  # Total number of observations
+  Ntot <- sum(N_obs)
+  # Initialise the consolidated discrepancy index
+  Ic <-0
+  for (i in 1:Ncomp){
+    # Give weight to compartments with more observations (more information)
+    Ic <- Ic +  I[i]* N_obs[i]/Ntot
+  }
+  # Name the list of compartment discrepancy indices
+  if ( !is.null(comp.names)){
+    names(I) <- comp.names
+  }else if (!is.null(names(observed))){
+    names(I) <- names(observed)
+  } else if (!is.null(names(predicted)) && is.null(comp.names) ){
+    names(I) <- names(predicted)
+  }
+  return(Ic)
+  #return(list(Total_index = Ic, Compartment_index= I))
+}
 
 #=====================================#
 #  Weighted Sum of Squared Residuals  #
@@ -261,7 +315,7 @@ obj_f <- function(x, params_names, constant_theta, constant_theta_names,
     
     if(sum(round(solution$time,2) %in% exp_time) == length(exp_time)){
       results <- solution[which(round(solution$time,2) %in% exp_time), 'C_tot']
-      score[temp_iter] <- AAFE(BodyBurden, results)
+      score[temp_iter] <- rmse(BodyBurden, results)
     }else{
       # stop(print("Length of predictions is not equal to the length of data"))
       score[temp_iter]=50000 
@@ -330,8 +384,8 @@ wrapper_opt <- function(X, options){
   for (i in 1:length(PFAS_names)) {
     optimization <- nloptr::nloptr(x0 = x0,
                                    eval_f = obj_f,
-                                   lb	=  c(2,-3),
-                                   ub =   c(10,3),
+                                   lb	=  c(3,-3),
+                                   ub =   c(8,3),
                                    constant_theta = constant_theta,
                                    constant_theta_names = constant_theta_names,
                                    params_names = params_names,
@@ -454,8 +508,8 @@ options["print_level"] = 0
 x01 <-  log10(c(0.01,  1e4,1e-5)) #ku, kon, c_prot_init
 optimization <- nloptr::nloptr(x0 = x01,
                                eval_f = level_1,
-                               lb	=  c(-3,1,-6),
-                               ub =   c(3,8,-3),
+                               lb	=  c(-3,-1,-6),
+                               ub =   c(3,6,-3),
                                options = options,
                                opts = opts
 )
