@@ -363,7 +363,7 @@ wrapper_opt <- function(X, options){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(5.5,0)
+  x0 <- c(4,0)
   params_names <- c("Ka", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "kon", "C_prot_init")
@@ -371,11 +371,11 @@ wrapper_opt <- function(X, options){
   
   # the selected settings for the optimizer
   opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-                "xtol_rel" = 1e-7,
-                "ftol_rel" = 1e-7,
+                "xtol_rel" = 1e-5,
+                "ftol_rel" = 1e-5,
                 "ftol_abs" = 0,
                 "xtol_abs" = 0 ,
-                "maxeval" = 1000,
+                "maxeval" = 500,
                 "print_level" = 0)
   
   opt_params_per_substance <- list()
@@ -397,7 +397,7 @@ wrapper_opt <- function(X, options){
                                    Cwater=Cwater[PFAS_names[i],],
                                    temperatures=temperatures,
                                    MW=Molecular_weights[[PFAS_names[i]]],
-                                   opts = opts
+                                   opts = options
     )
     score_per_substance[i] <- optimization$objective
     names(score_per_substance)[i] <- PFAS_names[i]
@@ -417,7 +417,7 @@ wrapper_opt <- function(X, options){
 ####
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins/rmse")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins/different_inits")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -492,11 +492,11 @@ level_1<- function(x0, options){
 }
 # the selected settings for the optimizer
 opts <- list( "algorithm" = "NLOPT_LN_SBPLX", #"NLOPT_LN_NELDERMEAD" ,#"NLOPT_LN_SBPLX", #"NLOPT_LN_BOBYQA" #"NLOPT_LN_COBYLA"
-              "xtol_rel" = 1e-7,
-              "ftol_rel" = 1e-7,
+              "xtol_rel" = 1e-5,
+              "ftol_rel" = 1e-5,
               "ftol_abs" = 0,
               "xtol_abs" = 0 ,
-              "maxeval" = 1000,
+              "maxeval" = 500,
               "print_level" = 1)
 options = opts
 options["print_level"] = 0
@@ -505,11 +505,11 @@ options["print_level"] = 0
 # constant_params=NULL,data_df, error_df
 # x0 must be given in log10-scale
 # x0 contains the initial values of the Ka and ke
-x01 <-  log10(c(0.01,  1,1e-5))#log10(c(0.01,  1e4,1e-5)) #ku, kon, c_prot_init
+x01 <-  log10(c(0.1,  1e3,1e-4))#log10(c(0.01,  1e4,1e-5)) #ku, kon, c_prot_init
 optimization <- nloptr::nloptr(x0 = x01,
                                eval_f = level_1,
                                lb	=  c(-3,-1,-6),
-                               ub =   c(3,8,-3),
+                               ub =   c(3,6,-3),
                                options = options,
                                opts = opts
 )

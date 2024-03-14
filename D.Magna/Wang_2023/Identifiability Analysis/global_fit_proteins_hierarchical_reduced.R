@@ -342,8 +342,8 @@ wrapper_opt <- function(X, options){
   data_plot <- list()
   
   for(sheet_name in PFAS_names){
-    #data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
-    data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
+    data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data_reduced2.xlsx', sheet = sheet_name)
+    #data_ls[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
     data_plot[[sheet_name]] <- openxlsx::read.xlsx ('Wang_data.xlsx', sheet = sheet_name)
   }
   
@@ -363,7 +363,7 @@ wrapper_opt <- function(X, options){
   # constant_params=NULL,data_df, error_df
   # x0 must be given in log10-scale
   # x0 contains the initial values of the Ka and ke
-  x0 <- c(5.5,0)
+  x0 <- c(5,0)
   params_names <- c("Ka", "ke")
   constant_theta = X
   constant_theta_names =  c("ku", "kon", "C_prot_init")
@@ -397,7 +397,7 @@ wrapper_opt <- function(X, options){
                                    Cwater=Cwater[PFAS_names[i],],
                                    temperatures=temperatures,
                                    MW=Molecular_weights[[PFAS_names[i]]],
-                                   opts = opts
+                                   opts = options
     )
     score_per_substance[i] <- optimization$objective
     names(score_per_substance)[i] <- PFAS_names[i]
@@ -417,7 +417,7 @@ wrapper_opt <- function(X, options){
 ####
 plot_func <- function(params,PFAS_data, PFAS_name, Cwater, age, temperatures,MW){
   library(ggplot2)
-  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins/rmse")
+  setwd("C:/Users/user/Documents/GitHub/PFAS_biokinetics_models/D.Magna/Wang_2023/Identifiability Analysis/plots/proteins/rmse_reduced")
   
   # Age of D.magna at beginning of exposure
   init_age <- age
@@ -505,11 +505,11 @@ options["print_level"] = 0
 # constant_params=NULL,data_df, error_df
 # x0 must be given in log10-scale
 # x0 contains the initial values of the Ka and ke
-x01 <-  log10(c(0.01,  1,1e-5))#log10(c(0.01,  1e4,1e-5)) #ku, kon, c_prot_init
+x01 <-  log10(c(0.01,  1e5,1e-5))#log10(c(0.01,  1e4,1e-5)) #ku, kon, c_prot_init
 optimization <- nloptr::nloptr(x0 = x01,
                                eval_f = level_1,
-                               lb	=  c(-3,-1,-6),
-                               ub =   c(3,8,-3),
+                               lb	=  c(-3,-1,-6.5),
+                               ub =   c(3,8,-2.5),
                                options = options,
                                opts = opts
 )
